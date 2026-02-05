@@ -9,3 +9,4 @@ pdfplumber
 pdfminer.six
 beautifulsoup4
 lxml
+feedparser
