@@ -1,45 +1,74 @@
 import json
 import os
-from cover_letter_generator import generate_cover_letter
+import subprocess
 from openai import OpenAI
+from cover_letter_generator import generate_cover_letter
 
 # ============================================
 # CONFIG
 # ============================================
 
-MATCH_THRESHOLD = 40
-MAX_APPLICATIONS = 15
-
+PROFILE_FILE = "data/profile.json"
 JOBS_FILE = "data/jobs.json"
+MATCHES_FILE = "data/matched_jobs.json"
 CACHE_FILE = "data/semantic_cache.json"
+LOG_FILE = "data/run_log.txt"
 
-OPENROUTER_API_KEY = "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"   # keep your real key
+MATCH_THRESHOLD = 70
+MAX_APPLICATIONS = 5
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+MODEL = "mistralai/mistral-7b-instruct"
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=OPENROUTER_API_KEY
 )
 
-MODEL = "openrouter/auto"
+os.makedirs("data", exist_ok=True)
 
 # ============================================
-# LOAD JOBS
+# LOGGER
+# ============================================
+
+def log(message):
+
+    print(message)
+
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(message + "\n")
+
+# Reset log each run
+open(LOG_FILE, "w").close()
+
+# ============================================
+# ENSURE JOBS EXIST
 # ============================================
 
 if not os.path.exists(JOBS_FILE):
-    print("No jobs file found.")
-    exit()
+
+    log("No jobs file found. Running job fetcher...\n")
+
+    subprocess.run(["python", "job_fetcher.py"])
+
+    if not os.path.exists(JOBS_FILE):
+        log("Job fetch failed. Exiting.")
+        exit()
+
+# ============================================
+# LOAD DATA
+# ============================================
+
+with open(PROFILE_FILE, "r", encoding="utf-8") as f:
+    profile = json.load(f)
 
 with open(JOBS_FILE, "r", encoding="utf-8") as f:
     jobs = json.load(f)
 
-print("\n=== PROFILE DRIVEN AUTO APPLY ===\n")
-
 # ============================================
-# LOAD / INIT SEMANTIC CACHE (SAFE)
+# SAFE CACHE LOAD
 # ============================================
-
-os.makedirs("data", exist_ok=True)
 
 semantic_cache = {}
 
@@ -47,42 +76,51 @@ if os.path.exists(CACHE_FILE):
 
     try:
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            semantic_cache = json.load(f)
+            data = json.load(f)
 
-    except json.JSONDecodeError:
-        print("⚠️ Cache file empty/corrupted — resetting...")
+            if isinstance(data, dict):
+                semantic_cache = data
+            else:
+                semantic_cache = {}
+
+    except:
         semantic_cache = {}
 
 # ============================================
-# PROFILE TEXT (FOR SCORING)
+# PROFILE TEXT
 # ============================================
 
-profile_text = """
-Customer Operations and Product Operations specialist
-with SaaS experience across onboarding, support,
-incident triage, workflow automation, and CX tooling
-like Zendesk, Okta, and Slack.
+profile_text = f"""
+Name: {profile.get('name')}
+
+Headline: {profile.get('headline')}
+
+Skills:
+{", ".join(profile.get('skills', []))}
 """
 
 # ============================================
-# SEMANTIC SCORING FUNCTION
+# SEMANTIC SCORING
 # ============================================
 
 def semantic_score(job):
 
+    title = job.get("title", "")
+    description = job.get("summary", "")
+
     prompt = f"""
-Score how well this candidate matches the job from 0–100.
+Rate match between candidate and job from 0–100.
 
 Candidate:
 {profile_text}
 
 Job Title:
-{job.get("title")}
+{title}
 
 Job Description:
-{job.get("summary")}
+{description}
 
-Respond ONLY with a number.
+Return ONLY a number.
 """
 
     response = client.chat.completions.create(
@@ -92,54 +130,61 @@ Respond ONLY with a number.
         max_tokens=5
     )
 
+    score_text = response.choices[0].message.content.strip()
+
     try:
-        score = int(response.choices[0].message.content.strip())
+        return int(score_text)
     except:
-        score = 0
-
-    return score
+        return 0
 
 # ============================================
-# SHORTLIST JOBS (basic filter)
+# RUN MATCHING
 # ============================================
 
-shortlisted_jobs = jobs   # using all jobs for now
+log("\n=== PROFILE DRIVEN AUTO APPLY ===\n")
 
-print(f"Shortlisted jobs: {len(shortlisted_jobs)}\n")
+shortlisted_jobs = jobs
 
-# ============================================
-# SEMANTIC SCORING + CACHE
-# ============================================
+log(f"Shortlisted jobs: {len(shortlisted_jobs)}\n")
 
 scored_jobs = []
 
-print("Scoring jobs semantically...\n")
+log("Scoring jobs semantically...\n")
 
 for i, job in enumerate(shortlisted_jobs, 1):
 
     job_id = job.get("title", "") + job.get("company", "")
 
-    print(f"[{i}/{len(shortlisted_jobs)}] {job['title']}")
-
-    # ---------- CACHE CHECK ----------
+    log(f"[{i}/{len(shortlisted_jobs)}] {job['title']}")
 
     if job_id in semantic_cache:
 
         score = semantic_cache[job_id]
-        print(f"⚡ Cached score: {score}")
+        log(f"⚡ Cached score: {score}")
 
     else:
 
-        score = semantic_score(job)
-        semantic_cache[job_id] = score
+        try:
+            score = semantic_score(job)
+            semantic_cache[job_id] = score
+            log(f"🧠 API score: {score}")
 
-        print(f"🧠 API score: {score}")
-
-    # ---------- MATCH FILTER ----------
+        except Exception as e:
+            log(f"❌ Semantic scoring failed: {e}")
+            score = 0
 
     if score >= MATCH_THRESHOLD:
         job["match_score"] = score
         scored_jobs.append(job)
+
+# ============================================
+# SAVE CACHE
+# ============================================
+
+with open(CACHE_FILE, "w", encoding="utf-8") as f:
+    json.dump(semantic_cache, f, indent=2)
+
+log("\nSemantic cache updated.")
 
 # ============================================
 # SORT BEST MATCHES
@@ -150,27 +195,33 @@ scored_jobs.sort(
     reverse=True
 )
 
-top_jobs = scored_jobs[:MAX_APPLICATIONS]
-
-print("\n=== BEST MATCHES ===\n")
-
-for job in top_jobs:
-
-    print(f"{job['company']}: {job['title']}")
-    print(f"Match score: {job['match_score']}%")
-    print(f"Apply → {job['apply_url']}\n")
-
-    # ---------- GENERATE COVER LETTER ----------
-
-    generate_cover_letter(job)
+best_matches = scored_jobs[:MAX_APPLICATIONS]
 
 # ============================================
-# SAVE CACHE
+# SAVE MATCHES
 # ============================================
 
-with open(CACHE_FILE, "w", encoding="utf-8") as f:
-    json.dump(semantic_cache, f, indent=2)
+with open(MATCHES_FILE, "w", encoding="utf-8") as f:
+    json.dump(best_matches, f, indent=2)
 
-print("\nSemantic cache updated.")
+# ============================================
+# DISPLAY + COVER LETTERS
+# ============================================
 
-print(f"\nBest matches processed: {len(top_jobs)}")
+log("\n=== BEST MATCHES ===\n")
+
+for job in best_matches:
+
+    log(f"{job.get('company')}: {job.get('title')}")
+    log(f"Match score: {job.get('match_score')}%")
+    log(f"Apply → {job.get('apply_url')}\n")
+
+    try:
+        generate_cover_letter(
+            job,
+            profile_keywords=profile.get("skills", [])
+        )
+    except Exception as e:
+        log(f"❌ Cover letter failed: {e}")
+
+log(f"\nBest matches processed: {len(best_matches)}")

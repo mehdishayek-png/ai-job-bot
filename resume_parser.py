@@ -1,108 +1,112 @@
 import pdfplumber
+import json
+import os
 import re
 
 # ============================================
-# CLEAN TEXT
+# CONFIG
+# ============================================
+
+OUTPUT_PATH = "data/profile.json"
+
+COMMON_SKILLS = [
+    "customer success",
+    "customer support",
+    "technical support",
+    "product operations",
+    "incident management",
+    "troubleshooting",
+    "automation",
+    "process optimization",
+    "stakeholder management",
+    "onboarding",
+    "saas",
+    "crm",
+    "zendesk",
+    "salesforce",
+    "hubspot",
+    "okta",
+    "slack",
+    "workato",
+    "analytics",
+    "predictive analytics",
+    "data analysis",
+    "project management",
+    "agile",
+    "scrum",
+    "api",
+    "integrations"
+]
+
+# ============================================
+# TEXT CLEANER
 # ============================================
 
 def clean_text(text):
-
     text = text.lower()
-
-    # Remove special characters
-    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
-
-    # Remove extra spaces
-    text = re.sub(r"\s+", " ", text)
-
+    text = re.sub(r"\n", " ", text)
+    text = re.sub(r"[^a-zA-Z0-9\s]", "", text)
     return text
 
 
 # ============================================
-# KEYWORD EXTRACTION
+# KEYWORD EXTRACTOR
 # ============================================
 
 def extract_keywords(text):
 
-    keywords_pool = [
+    keywords_found = []
 
-        # Customer Success / CX
-        "customer success",
-        "customer support",
-        "customer operations",
-        "onboarding",
-        "retention",
-        "renewals",
-        "expansion",
+    for skill in COMMON_SKILLS:
+        if skill in text:
+            keywords_found.append(skill)
 
-        # Product / Ops
-        "product operations",
-        "incident management",
-        "incident triage",
-        "rca",
-        "sla",
-        "process optimization",
-        "workflow automation",
-        "stakeholder management",
-        "product feedback",
-        "beta testing",
-
-        # SaaS / Technical
-        "saas",
-        "api",
-        "sso",
-        "identity access management",
-        "troubleshooting",
-        "automation",
-
-        # Tools
-        "zendesk",
-        "salesforce",
-        "hubspot",
-        "intercom",
-        "jira",
-        "okta",
-        "slack",
-        "workato",
-
-        # Data / Analytics
-        "analytics",
-        "predictive analytics"
-    ]
-
-    found = []
-
-    for kw in keywords_pool:
-        if kw in text:
-            found.append(kw)
-
-    return found[:25]   # Cap at 25 keywords
+    return list(set(keywords_found))
 
 
 # ============================================
-# MAIN PARSER FUNCTION
+# MAIN BUILDER (UI EXPECTS THIS)
 # ============================================
 
-def parse_resume(file_path):
+def build_profile(pdf_path):
 
-    text = ""
+    print("\nParsing resume...")
 
-    # Read PDF
-    with pdfplumber.open(file_path) as pdf:
+    if not os.path.exists(pdf_path):
+        print("Resume file not found.")
+        return
 
+    full_text = ""
+
+    with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
-            text += page.extract_text() or ""
+            full_text += page.extract_text() or ""
 
-    # Clean text
-    cleaned = clean_text(text)
+    cleaned = clean_text(full_text)
 
-    # Extract keywords
     keywords = extract_keywords(cleaned)
 
-    # Build profile
     profile = {
         "name": "Candidate",
         "skills": keywords
     }
 
-    return profile
+    os.makedirs("data", exist_ok=True)
+
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(profile, f, indent=2)
+
+    print("\nProfile built successfully.")
+    print(f"Skills extracted: {len(keywords)}")
+    print(f"Saved → {OUTPUT_PATH}")
+
+
+# ============================================
+# TEST RUN
+# ============================================
+
+if __name__ == "__main__":
+
+    sample_path = "resume/resume.pdf"
+
+    build_profile(sample_path)

@@ -1,0 +1,2 @@
+2026-02-05 17:40:33.417025 → Generating cover letter → TestCorp_Customer Success Manager
+2026-02-05 17:40:36.947875 → Saved → output/cover_letters\TestCorp__Customer_Success_Manager.txt
