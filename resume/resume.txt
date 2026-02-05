@@ -1,0 +1,65 @@
+MEHDI SHAYEK
+Product Operations & Customer Experience Specialist
++91 6364720760 | mehdishayek@gmail.com | Bengaluru, India | Open to Remote
+International Roles
+PROFESSIONAL SUMMARY
+Product operations specialist with 2+ years owning enterprise incident triage for Fortune
+500 SaaS customers (OpenAI, Google, MongoDB, Stripe, CrowdStrike). Expert in P0/P1
+incident lifecycles, cross-functional coordination, and building scalable SOPs that reduce
+escalations. Skilled with Okta, Workato, S3, and Zendesk. Seeking remote international
+product ops or CX operations role.
+PROFESSIONAL EXPERIENCE
+CUSTOMER EXPERIENCE & OPERATIONS SPECIALIST — Klarity.ai
+2024–Present | Bengaluru / Remote
+Owned incident triage for 12+ Fortune 500 customers via Slack Connect; managed
+full lifecycle (intake 
+→
+ resolution 
+→
+ stakeholder comms) with 95%+ SLA compliance.
+Identi ed recurring issue patterns and fed predictive analytics to
+Product/Engineering roadmaps, reducing repeat escalations.
+Led P0/P1 incidents (MeridianLink December close: 71 data xes; MongoDB auth
+outages); drove cross-functional RCAs with clear timelines.
+Formalized SSO/access work ows for Stripe and Zuora, resolving 90% of login issues;
+reduced time-to-unblock by 40% globally.
+Administered Okta for 200+ global users; ensured authentication con gurations and
+incident response for identity blockers.
+Led beta testing of Klarity AI "Coach" product, validating work ows and contributing
+to 90% stability improvement pre-GA.
+Built incident work ows using Workato, S3, Zendesk; synthesized technical root
+causes into executive-level narratives.
+QUALITY CONTROL SPECIALIST — Deluxe Media Entertainment
+2021–2023 | Bangalore
+Performed QC for streaming platforms (Net ix, Disney+, Prime Video), ensuring strict
+compliance with platform-speci c technical and content standards.
+Troubleshot video encoding and formatting issues; mentored new QC recruits on
+work ow processes and quality tools, reducing rework rate by 15%.
+CONTENT STRATEGIST — Earthly Farms Ltd
+2021–2022 | Remote
+Built 12-month content marketing calendar; analyzed monthly conversions and
+optimized messaging.
+SKILLS
+Product & Operations
+Incident triage and management (P0/P1), SLA and TAT management, root cause analysis
+(RCA) and post-mortems, cross-functional stakeholder coordination, SOP and work ow
+design, process optimization, predictive analytics, beta testing and product feedback.
+Tools & Platforms
+Zendesk, Workato, Amazon S3, Okta (SSO/IAM administration), Slack, Email/Slack Connect,
+Linear, QC and video production software.
+Domains
+SaaS customer operations, enterprise incident response, SSO and authentication
+troubleshooting, document automation and AI work ows, streaming media quality
+assurance, identity and access management.
+Languages
+English ( uent), Hindi ( uent), Malayalam ( uent).
+EDUCATION
+Diploma in Graphic Design
+AIDA School of Design, 2022–2023
+Diploma in Visual Communication
+New Horizon PU College, 2020–2022
+Pre-University Commerce (Marketing)
+New Horizon PU College, 2016–2018
+CERTIFICATIONS & RECOGNITION
+Lead beta tester, Klarity AI "Coach" product (pre-GA, 2025)
+References available upon request.
