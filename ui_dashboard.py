@@ -395,9 +395,10 @@ with col_left:
                                 saved = json.load(f)
                             st.session_state["_profile_built"] = True
 
-                            # Clear input field cache
-                            for k in ("name_input", "headline_input", "skills_input"):
-                                st.session_state.pop(k, None)
+                            # Pre-fill edit fields with parsed data
+                            st.session_state["name_input"] = saved.get("name", "")
+                            st.session_state["headline_input"] = saved.get("headline", "")
+                            st.session_state["skills_input"] = "\n".join(saved.get("skills", []))
 
                             skill_count = len(saved.get("skills", []))
                             name = saved.get("name", "Candidate")
@@ -458,19 +459,16 @@ with col_right:
     with st.expander("✏️ Edit profile manually" if has_profile else "✏️ Create profile manually", expanded=not has_profile):
         name_val = st.text_input(
             "Full Name",
-            value=profile.get("name", ""),
             key="name_input",
             placeholder="Your full name"
         )
         headline_input = st.text_input(
             "Professional Headline",
-            value=profile.get("headline", ""),
             key="headline_input",
             placeholder="e.g. Customer Success Manager | SaaS",
         )
         skills_input = st.text_area(
             "Skills / Keywords (one per line)",
-            value="\n".join(profile.get("skills", [])),
             height=150,
             key="skills_input",
             placeholder="salesforce\nzendesk\ncustomer success\nsaas\n..."

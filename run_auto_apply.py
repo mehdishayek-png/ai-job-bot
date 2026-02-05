@@ -49,7 +49,7 @@ client = OpenAI(
 
 MODEL = os.getenv("SCORING_MODEL", "mistralai/mistral-7b-instruct")
 MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "5"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "15"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))  # seconds between calls
 
 # ============================================
