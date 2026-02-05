@@ -5,105 +5,104 @@ import uuid
 from dotenv import load_dotenv
 
 # ============================================
-# LOAD API KEY EARLY - STREAMLIT COMPATIBLE
+# PAGE CONFIG — MUST BE THE VERY FIRST st.* CALL
 # ============================================
 
-# Try Streamlit secrets first, then fall back to .env
+st.set_page_config(page_title="AI Job Application Bot", layout="wide")
+
+# ============================================
+# LOAD API KEY
+# ============================================
+
 try:
     api_key = st.secrets["OPENROUTER_API_KEY"]
-    st.success("✅ API key loaded from Streamlit secrets")
 except (KeyError, AttributeError):
     load_dotenv()
     api_key = os.getenv("OPENROUTER_API_KEY")
-    if api_key:
-        st.info("✅ API key loaded from .env file")
 
-# Validate API key exists
 if not api_key:
     st.error("❌ OPENROUTER_API_KEY not found!")
-    st.info("Please add your API key to Streamlit Cloud secrets")
-    st.markdown("""
-    **How to add secrets:**
-    1. Go to your app settings in Streamlit Cloud
-    2. Navigate to "Secrets" section
-    3. Add: `OPENROUTER_API_KEY = "your-key-here"`
-    """)
+    st.markdown(
+        """
+**How to add secrets on Streamlit Cloud:**
+1. Go to your app settings → **Secrets**
+2. Add: `OPENROUTER_API_KEY = "your-key-here"`
+"""
+    )
     st.stop()
 
-# Internal imports (after API key validation)
+# ============================================
+# INTERNAL IMPORTS (after key validation)
+# ============================================
+
 from resume_parser import build_profile
-
-# Import run_auto_apply but handle if it fails
-try:
-    from run_auto_apply import main as run_auto_apply_pipeline
-except Exception as e:
-    st.warning(f"Auto-apply module import warning: {str(e)}")
-    run_auto_apply_pipeline = None
+from run_auto_apply import run_auto_apply_pipeline
 
 # ============================================
-# SESSION ISOLATION - CREATE UNIQUE USER DIRECTORIES
+# SESSION ISOLATION — unique dirs per browser tab
 # ============================================
 
-# Initialize session ID if not exists
-if 'session_id' not in st.session_state:
+if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())[:8]
 
-# Create unique directories for this session
-SESSION_DIR = f"data/session_{st.session_state.session_id}"
-SESSION_OUTPUT_DIR = f"output/session_{st.session_state.session_id}"
+SID = st.session_state.session_id
+SESSION_DIR = f"data/session_{SID}"
+SESSION_OUTPUT_DIR = f"output/session_{SID}"
+LETTERS_DIR = os.path.join(SESSION_OUTPUT_DIR, "cover_letters")
 
-os.makedirs(SESSION_DIR, exist_ok=True)
-os.makedirs(SESSION_OUTPUT_DIR, exist_ok=True)
+for d in [SESSION_DIR, SESSION_OUTPUT_DIR, LETTERS_DIR]:
+    os.makedirs(d, exist_ok=True)
 
-# Update file paths to use session directories
+# Paths scoped to this session
 PROFILE_FILE = os.path.join(SESSION_DIR, "profile.json")
 JOBS_FILE = os.path.join(SESSION_DIR, "jobs.json")
 MATCHES_FILE = os.path.join(SESSION_DIR, "matched_jobs.json")
 CACHE_FILE = os.path.join(SESSION_DIR, "semantic_cache.json")
-LETTERS_DIR = os.path.join(SESSION_OUTPUT_DIR, "cover_letters")
-
-os.makedirs(LETTERS_DIR, exist_ok=True)
-
-# ============================================
-# CONFIG
-# ============================================
-
-st.set_page_config(
-    page_title="AI Job Application Bot",
-    layout="wide"
-)
+LOG_FILE = os.path.join(SESSION_DIR, "run_log.txt")
 
 # ============================================
 # HELPERS
 # ============================================
 
 def load_json(path):
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            st.warning(f"Failed to load {path}: {str(e)}")
-            return {}
-    return {}
+    """Load JSON file, return {} or [] depending on content, or {} if missing."""
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_json(path, data):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 # ============================================
 # HEADER
 # ============================================
 
 st.title("🤖 AI Job Application Bot")
-st.caption(
-    "Upload resume → Extract profile → Match jobs → Generate cover letters"
-)
+st.caption("Upload resume → Extract profile → Match jobs → Generate cover letters")
 
-# Show session info in sidebar for debugging
 with st.sidebar:
-    st.caption(f"Session ID: {st.session_state.session_id}")
+    st.caption(f"Session: `{SID}`")
     if st.button("🔄 Start New Session"):
-        # Clear session state to get new ID
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
+
+# ============================================
+# LOAD PROFILE — always read fresh from disk
+# ============================================
+
+_disk_profile = load_json(PROFILE_FILE)
+if isinstance(_disk_profile, dict) and _disk_profile.get("skills"):
+    profile = _disk_profile
+else:
+    profile = {"name": "", "headline": "", "skills": []}
 
 # ============================================
 # RESUME UPLOAD
@@ -111,44 +110,33 @@ with st.sidebar:
 
 st.header("📄 Resume Upload")
 
-uploaded = st.file_uploader(
-    "Upload your resume (PDF)",
-    type=["pdf"]
-)
+uploaded = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
 
 if uploaded:
-
     save_path = os.path.join(SESSION_DIR, uploaded.name)
-
     with open(save_path, "wb") as f:
         f.write(uploaded.read())
-
     st.success("Resume uploaded successfully.")
 
     if st.button("🧠 Build Profile From Resume"):
-
-        with st.spinner("Parsing resume..."):
-
+        with st.spinner("Parsing resume…"):
             try:
-                # Update resume_parser to use session directory
-                import resume_parser
-                resume_parser.OUTPUT_PATH = PROFILE_FILE
-                
-                build_profile(save_path)
-                st.success("✅ Profile built successfully!")
-                
-                # Force reload the page to show extracted data
+                build_profile(save_path, output_path=PROFILE_FILE)
+                st.success("✅ Profile built!")
+
+                # ===================================================
+                # FIX: Clear widget keys so text_input/text_area
+                # pick up the NEW profile values on rerun.
+                # Without this, Streamlit ignores value= because
+                # the old value is cached in session_state[key].
+                # ===================================================
+                for k in ("name_input", "headline_input", "skills_input"):
+                    st.session_state.pop(k, None)
+
                 st.rerun()
-                
             except Exception as e:
-                st.error(f"❌ Profile building failed: {str(e)}")
+                st.error(f"❌ Profile building failed: {e}")
                 st.exception(e)
-
-# ============================================
-# LOAD PROFILE (for display and editing)
-# ============================================
-
-profile = load_json(PROFILE_FILE)
 
 # ============================================
 # EXTRACTION RESULTS
@@ -156,28 +144,19 @@ profile = load_json(PROFILE_FILE)
 
 st.header("🧠 Extraction Results")
 
-if profile and profile.get("skills"):
-
+if profile.get("skills"):
     col1, col2 = st.columns(2)
-
     with col1:
         st.subheader("Extracted Skills")
-        st.write(f"Total skills: {len(profile.get('skills', []))}")
-
-        if profile.get("skills"):
-            for skill in profile.get("skills", []):
-                st.write(f"• {skill}")
-
+        st.write(f"**{len(profile['skills'])}** skills detected")
+        for skill in profile["skills"]:
+            st.write(f"• {skill}")
     with col2:
         st.subheader("Professional Headline")
-        headline = profile.get("headline", "Not detected")
-        if headline and headline != "Not detected":
-            st.write(headline)
-        else:
-            st.info("No headline detected - you can add one below")
-
+        headline = profile.get("headline", "")
+        st.write(headline if headline else "_No headline detected — add one below._")
 else:
-    st.info("📤 Upload and parse a resume to see extracted information")
+    st.info("📤 Upload and parse a resume to see extracted information.")
 
 # ============================================
 # EDITABLE PROFILE
@@ -185,47 +164,37 @@ else:
 
 st.header("👤 Editable Profile")
 
-# Initialize with empty values if no profile exists
-if not profile:
-    profile = {"name": "", "skills": [], "headline": ""}
-
-# Form inputs - these will auto-populate if profile exists
 name = st.text_input(
     "Full Name",
     value=profile.get("name", ""),
-    key="name_input"
+    key="name_input",
 )
-
-headline = st.text_input(
+headline_val = st.text_input(
     "Professional Headline",
     value=profile.get("headline", ""),
-    key="headline_input"
+    key="headline_input",
 )
-
 skills_text = st.text_area(
     "Skills / Keywords (one per line)",
     value="\n".join(profile.get("skills", [])),
     height=200,
     help="Add skills that match the jobs you're targeting",
-    key="skills_input"
+    key="skills_input",
 )
 
 if st.button("💾 Save Profile"):
-
     updated = {
         "name": name,
-        "headline": headline,
-        "skills": [
-            s.strip()
-            for s in skills_text.split("\n")
-            if s.strip()
-        ]
+        "headline": headline_val,
+        "skills": [s.strip() for s in skills_text.split("\n") if s.strip()],
     }
+    save_json(PROFILE_FILE, updated)
+    st.success("✅ Profile saved!")
 
-    with open(PROFILE_FILE, "w", encoding="utf-8") as f:
-        json.dump(updated, f, indent=2)
+    # Clear widget keys so rerun reads fresh values
+    for k in ("name_input", "headline_input", "skills_input"):
+        st.session_state.pop(k, None)
 
-    st.success("✅ Profile saved successfully!")
     st.rerun()
 
 # ============================================
@@ -234,42 +203,65 @@ if st.button("💾 Save Profile"):
 
 st.header("🚀 Run Auto Apply")
 
-if not profile or not profile.get("skills"):
-    st.warning("⚠️ Please create a profile first before running job matching")
+if not profile.get("skills"):
+    st.warning("⚠️ Please create a profile with skills before running job matching.")
 else:
+    # Optional custom jobs upload
+    st.markdown("_Optionally upload a custom `jobs.json`, or we'll fetch from RSS feeds._")
+    jobs_upload = st.file_uploader("Upload jobs.json (optional)", type=["json"], key="jobs_upload")
+
+    if jobs_upload:
+        try:
+            jobs_data = json.loads(jobs_upload.read())
+            save_json(JOBS_FILE, jobs_data)
+            st.success(f"Loaded {len(jobs_data)} jobs from upload.")
+        except Exception as e:
+            st.error(f"Invalid JSON: {e}")
+
     if st.button("▶ Run Job Matching"):
+        status_box = st.empty()
+        log_expander = st.expander("📋 Live log", expanded=True)
+        log_lines = []
 
-        if run_auto_apply_pipeline is None:
-            st.error("❌ Auto-apply module not available")
-        else:
-            with st.spinner("Running job matching pipeline..."):
+        def _progress(msg):
+            log_lines.append(msg)
+            with log_expander:
+                st.text("\n".join(log_lines[-30:]))
 
-                try:
-                    # Create a progress container
-                    progress_container = st.empty()
-                    
-                    progress_container.info("🔍 Fetching jobs...")
-                    
-                    # Need to temporarily update the module's file paths for this session
-                    import run_auto_apply
-                    run_auto_apply.PROFILE_FILE = PROFILE_FILE
-                    run_auto_apply.JOBS_FILE = JOBS_FILE
-                    run_auto_apply.MATCHES_FILE = MATCHES_FILE
-                    run_auto_apply.CACHE_FILE = CACHE_FILE
-                    
-                    # Update cover letter generator paths too
-                    import cover_letter_generator
-                    cover_letter_generator.OUTPUT_DIR = LETTERS_DIR
-                    cover_letter_generator.CACHE_FILE = os.path.join(SESSION_DIR, "cover_letter_cache.json")
-                    
-                    run_auto_apply_pipeline()
-                    
-                    progress_container.success("✅ Matching complete!")
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"❌ Pipeline failed: {str(e)}")
-                    st.exception(e)
+        status_box.info("🔍 Running matching pipeline…")
+
+        try:
+            # ===================================================
+            # FIX: Pass all session paths as FUNCTION PARAMETERS.
+            # No monkey-patching of module globals needed.
+            # ===================================================
+            result = run_auto_apply_pipeline(
+                profile_file=PROFILE_FILE,
+                jobs_file=JOBS_FILE,
+                matches_file=MATCHES_FILE,
+                cache_file=CACHE_FILE,
+                log_file=LOG_FILE,
+                letters_dir=LETTERS_DIR,
+                progress_callback=_progress,
+            )
+
+            if result and result.get("status") == "success":
+                status_box.success(
+                    f"✅ Done — {result['matches']} matches "
+                    f"out of {result['total_scored']} jobs scored."
+                )
+            elif result and result.get("status") == "no_matches":
+                status_box.warning(
+                    "No jobs met the match threshold. "
+                    "Try broadening your skills or uploading different jobs."
+                )
+            else:
+                status_box.error(f"Pipeline returned: {result}")
+
+            st.rerun()
+        except Exception as e:
+            status_box.error(f"❌ Pipeline failed: {e}")
+            st.exception(e)
 
 # ============================================
 # MATCH RESULTS
@@ -279,26 +271,25 @@ matches = load_json(MATCHES_FILE)
 
 st.header("📊 Semantic Match Results")
 
-if matches:
-
-    st.success(f"Found {len(matches)} matching jobs!")
+if isinstance(matches, list) and matches:
+    st.success(f"Found **{len(matches)}** matching jobs!")
 
     for i, job in enumerate(matches, 1):
-        
-        with st.expander(f"#{i} - {job.get('company')} - {job.get('title')} ({job.get('match_score')}%)"):
+        label = (
+            f"#{i}  —  {job.get('company', '?')}  ·  "
+            f"{job.get('title', '?')}  ({job.get('match_score', '?')}%)"
+        )
+        with st.expander(label):
             st.write(f"**Company:** {job.get('company')}")
             st.write(f"**Title:** {job.get('title')}")
             st.write(f"**Match Score:** {job.get('match_score')}%")
-            st.write(f"**Source:** {job.get('source')}")
-            
-            if job.get('summary'):
-                st.write(f"**Description:** {job.get('summary')[:200]}...")
-            
-            if job.get('apply_url'):
-                st.link_button("Apply Now", job.get('apply_url'))
-
+            st.write(f"**Source:** {job.get('source', 'N/A')}")
+            if job.get("summary"):
+                st.write(f"**Description:** {job['summary'][:300]}…")
+            if job.get("apply_url"):
+                st.link_button("🔗 Apply Now", job["apply_url"])
 else:
-    st.info("Run matching to see results here")
+    st.info("Run matching to see results here.")
 
 # ============================================
 # COVER LETTER VIEWER
@@ -307,53 +298,37 @@ else:
 st.header("📝 Generated Cover Letters")
 
 if os.path.exists(LETTERS_DIR):
-
-    files = [f for f in os.listdir(LETTERS_DIR) if f.endswith('.txt')]
+    files = sorted(f for f in os.listdir(LETTERS_DIR) if f.endswith(".txt"))
 
     if files:
+        st.success(f"Generated **{len(files)}** cover letters")
 
-        st.success(f"Generated {len(files)} cover letters")
-
-        selected = st.selectbox(
-            "Select a cover letter to view",
-            files
-        )
-
+        selected = st.selectbox("Select a cover letter to view", files)
         if selected:
             try:
-                with open(
-                    os.path.join(LETTERS_DIR, selected),
-                    "r",
-                    encoding="utf-8"
-                ) as f:
-                    content = f.read()
-
-                st.text_area(
-                    "Cover Letter Preview",
-                    content,
-                    height=300
-                )
-                
-                # Add download button
+                content = open(
+                    os.path.join(LETTERS_DIR, selected), "r", encoding="utf-8"
+                ).read()
+                st.text_area("Cover Letter Preview", content, height=300)
                 st.download_button(
-                    label="📥 Download Cover Letter",
+                    "📥 Download",
                     data=content,
                     file_name=selected,
-                    mime="text/plain"
+                    mime="text/plain",
                 )
-                
             except Exception as e:
-                st.error(f"Failed to load cover letter: {str(e)}")
-
+                st.error(f"Failed to load: {e}")
     else:
-        st.info("No cover letters generated yet. Run matching to generate them!")
-
+        st.info("No cover letters yet. Run matching first!")
 else:
-    st.info("No cover letters directory found")
+    st.info("No cover letters directory found.")
 
 # ============================================
 # FOOTER
 # ============================================
 
 st.divider()
-st.caption("💡 Tip: Each session is isolated. Click 'Start New Session' in the sidebar to begin fresh.")
+st.caption(
+    "💡 Each session is isolated — click **Start New Session** "
+    "in the sidebar to begin fresh."
+)

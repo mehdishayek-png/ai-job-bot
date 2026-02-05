@@ -1,12 +1,7 @@
 streamlit
 openai
-requests
 python-dotenv
-pandas
-numpy
-scikit-learn
-pdfplumber
-pdfminer.six
-beautifulsoup4
-lxml
 feedparser
+requests
+beautifulsoup4
+pdfplumber
