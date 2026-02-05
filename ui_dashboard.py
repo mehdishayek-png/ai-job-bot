@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import uuid
 from dotenv import load_dotenv
 
 # ============================================
@@ -40,6 +41,30 @@ except Exception as e:
     run_auto_apply_pipeline = None
 
 # ============================================
+# SESSION ISOLATION - CREATE UNIQUE USER DIRECTORIES
+# ============================================
+
+# Initialize session ID if not exists
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())[:8]
+
+# Create unique directories for this session
+SESSION_DIR = f"data/session_{st.session_state.session_id}"
+SESSION_OUTPUT_DIR = f"output/session_{st.session_state.session_id}"
+
+os.makedirs(SESSION_DIR, exist_ok=True)
+os.makedirs(SESSION_OUTPUT_DIR, exist_ok=True)
+
+# Update file paths to use session directories
+PROFILE_FILE = os.path.join(SESSION_DIR, "profile.json")
+JOBS_FILE = os.path.join(SESSION_DIR, "jobs.json")
+MATCHES_FILE = os.path.join(SESSION_DIR, "matched_jobs.json")
+CACHE_FILE = os.path.join(SESSION_DIR, "semantic_cache.json")
+LETTERS_DIR = os.path.join(SESSION_OUTPUT_DIR, "cover_letters")
+
+os.makedirs(LETTERS_DIR, exist_ok=True)
+
+# ============================================
 # CONFIG
 # ============================================
 
@@ -47,13 +72,6 @@ st.set_page_config(
     page_title="AI Job Application Bot",
     layout="wide"
 )
-
-PROFILE_FILE = "data/profile.json"
-MATCHES_FILE = "data/matched_jobs.json"
-LETTERS_DIR = "output/cover_letters"
-
-os.makedirs("data", exist_ok=True)
-os.makedirs(LETTERS_DIR, exist_ok=True)
 
 # ============================================
 # HELPERS
@@ -78,6 +96,15 @@ st.caption(
     "Upload resume → Extract profile → Match jobs → Generate cover letters"
 )
 
+# Show session info in sidebar for debugging
+with st.sidebar:
+    st.caption(f"Session ID: {st.session_state.session_id}")
+    if st.button("🔄 Start New Session"):
+        # Clear session state to get new ID
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
 # ============================================
 # RESUME UPLOAD
 # ============================================
@@ -93,7 +120,7 @@ profile = load_json(PROFILE_FILE)
 
 if uploaded:
 
-    save_path = f"data/{uploaded.name}"
+    save_path = os.path.join(SESSION_DIR, uploaded.name)
 
     with open(save_path, "wb") as f:
         f.write(uploaded.read())
@@ -207,6 +234,19 @@ else:
                     progress_container = st.empty()
                     
                     progress_container.info("🔍 Fetching jobs...")
+                    
+                    # Need to temporarily update the module's file paths for this session
+                    import run_auto_apply
+                    run_auto_apply.PROFILE_FILE = PROFILE_FILE
+                    run_auto_apply.JOBS_FILE = JOBS_FILE
+                    run_auto_apply.MATCHES_FILE = MATCHES_FILE
+                    run_auto_apply.CACHE_FILE = CACHE_FILE
+                    
+                    # Update cover letter generator paths too
+                    import cover_letter_generator
+                    cover_letter_generator.OUTPUT_DIR = LETTERS_DIR
+                    cover_letter_generator.CACHE_FILE = os.path.join(SESSION_DIR, "cover_letter_cache.json")
+                    
                     run_auto_apply_pipeline()
                     
                     progress_container.success("✅ Matching complete!")
@@ -301,4 +341,4 @@ else:
 # ============================================
 
 st.divider()
-st.caption("💡 Tip: Check your Streamlit Cloud logs if you encounter any errors")
+st.caption("💡 Tip: Each session is isolated. Click 'Start New Session' in the sidebar to begin fresh.")
