@@ -1,5 +1,29 @@
 import json
+import os
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# ============================================
+# LOAD API KEY - STREAMLIT COMPATIBLE
+# ============================================
+
+# Try Streamlit secrets first, then fall back to .env
+try:
+    import streamlit as st
+    api_key = st.secrets["OPENROUTER_API_KEY"]
+except (ImportError, KeyError, AttributeError):
+    load_dotenv()
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+# Validate API key
+if not api_key:
+    error_msg = "❌ OPENROUTER_API_KEY not found"
+    try:
+        import streamlit as st
+        st.error(error_msg)
+        st.stop()
+    except ImportError:
+        raise ValueError(error_msg)
 
 # ============================================
 # CONFIG
@@ -13,7 +37,7 @@ MAX_MATCHES = 10
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key="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"
+    api_key=api_key  # Use validated API key instead of hardcoded one
 )
 
 MODEL = "openrouter/auto"
@@ -84,21 +108,26 @@ JOB:
 {job_text}
 """
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0,
-        max_tokens=5
-    )
-
     try:
-        score = int(response.choices[0].message.content.strip())
-    except:
-        score = 0
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0,
+            max_tokens=5
+        )
 
-    return score
+        try:
+            score = int(response.choices[0].message.content.strip())
+        except:
+            score = 0
+
+        return score
+        
+    except Exception as e:
+        print(f"❌ Scoring failed for {job.get('title')}: {str(e)}")
+        return 0
 
 # ============================================
 # SCORE JOBS

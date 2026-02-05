@@ -5,10 +5,27 @@ from dotenv import load_dotenv
 import datetime
 
 # ============================================
-# LOAD ENV (API KEY FIX)
+# LOAD ENV (API KEY FIX) - STREAMLIT COMPATIBLE
 # ============================================
 
-load_dotenv()
+# Try Streamlit secrets first, then fall back to .env
+try:
+    import streamlit as st
+    api_key = st.secrets["OPENROUTER_API_KEY"]
+except (ImportError, KeyError, AttributeError):
+    # Fall back to .env for local development
+    load_dotenv()
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
+# Validate API key is present
+if not api_key:
+    error_msg = "❌ OPENROUTER_API_KEY not found. Add it to Streamlit secrets or .env file."
+    try:
+        import streamlit as st
+        st.error(error_msg)
+        st.stop()
+    except ImportError:
+        raise ValueError(error_msg)
 
 # ============================================
 # CONFIG
@@ -58,7 +75,7 @@ else:
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
+    api_key=api_key  # Use the validated API key from above
 )
 
 MODEL = "mistralai/mistral-7b-instruct"
@@ -131,7 +148,7 @@ Job Description:
 """
 
     # ----------------------------------------
-    # API CALL
+    # API CALL WITH ERROR HANDLING
     # ----------------------------------------
 
     try:
@@ -149,6 +166,14 @@ Job Description:
 
         log(f"API ERROR → {str(e)}")
         print(f"❌ API Error: {e}")
+        
+        # Show error in Streamlit if available
+        try:
+            import streamlit as st
+            st.error(f"Cover Letter API Error: {str(e)}")
+        except ImportError:
+            pass
+            
         return
 
     # ----------------------------------------

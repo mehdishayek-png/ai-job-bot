@@ -1,11 +1,22 @@
 import os
 import json
 import requests
+from dotenv import load_dotenv
 
 print("SCRIPT STARTED")
 print("JOBBOT BATCH ENGINE STARTED")
 
-API_KEY = os.getenv("OPENROUTER_API_KEY")
+# ============================================
+# LOAD API KEY - STREAMLIT COMPATIBLE
+# ============================================
+
+# Try Streamlit secrets first, then fall back to .env
+try:
+    import streamlit as st
+    API_KEY = st.secrets["OPENROUTER_API_KEY"]
+except (ImportError, KeyError, AttributeError):
+    load_dotenv()
+    API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 if not API_KEY:
     print("ERROR: OPENROUTER_API_KEY not found")
@@ -44,14 +55,19 @@ def call_llm(prompt):
         "temperature": 0.2
     }
 
-    response = requests.post(BASE_URL, headers=headers, json=payload)
+    try:
+        response = requests.post(BASE_URL, headers=headers, json=payload)
 
-    if response.status_code != 200:
-        print("API ERROR:", response.text)
-        exit(1)
+        if response.status_code != 200:
+            print("API ERROR:", response.text)
+            return None
 
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
+        
+    except Exception as e:
+        print(f"LLM call failed: {str(e)}")
+        return None
 
 
 # Load base files
@@ -89,6 +105,10 @@ for job_file in job_files:
 
     match_prompt = base_prompt + "\n\nJOB DESCRIPTION:\n" + job_text
     match_result = call_llm(match_prompt)
+    
+    if not match_result:
+        print("Match call failed - skipping job")
+        continue
 
     match_output_file = os.path.join(
         OUTPUT_DIR,
@@ -106,20 +126,24 @@ for job_file in job_files:
         match_json = json.loads(match_result)
         score = int(match_json.get("match_score", 0))
     except:
-        print("Invalid match JSON — skipping job.")
+        print("Invalid match JSON – skipping job.")
         continue
 
     if score < APPLY_THRESHOLD:
-        print(f"Score too low ({score}) — skipping application.")
+        print(f"Score too low ({score}) – skipping application.")
         continue
 
-    print(f"Score accepted ({score}) — generating cover letter.")
+    print(f"Score accepted ({score}) – generating cover letter.")
 
     # ===== COVER LETTER =====
 
     cover_prompt = cover_template.replace("{{PROFILE}}", profile_data).replace("{{JOB}}", job_text)
 
     cover_result = call_llm(cover_prompt)
+    
+    if not cover_result:
+        print("Cover letter call failed - skipping")
+        continue
 
     cover_output_file = os.path.join(
         OUTPUT_DIR,
