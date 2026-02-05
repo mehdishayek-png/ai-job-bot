@@ -1,15 +1,7 @@
 import os
-import json
 from openai import OpenAI
 
-# ============================================
-# CONFIG
-# ============================================
-
-OUTPUT_DIR = "output/cover_letters"
-CACHE_FILE = "data/cover_letter_cache.json"
-
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
