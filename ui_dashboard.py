@@ -267,19 +267,26 @@ def load_json(path):
 def save_json(path, data):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 # ============================================
 # LOAD PROFILE FROM DISK
 # ============================================
 
 _disk_profile = load_json(PROFILE_FILE)
-if isinstance(_disk_profile, dict) and _disk_profile.get("skills"):
-    profile = _disk_profile
+
+# More flexible profile validation
+if isinstance(_disk_profile, dict):
+    # Accept profile if it has at least a name OR skills
+    if _disk_profile.get("name") or _disk_profile.get("skills"):
+        profile = _disk_profile
+    else:
+        profile = {"name": "", "headline": "", "skills": []}
 else:
     profile = {"name": "", "headline": "", "skills": []}
 
-has_profile = bool(profile.get("skills"))
+# Profile is valid if it has skills OR a name
+has_profile = bool(profile.get("skills") or (profile.get("name") and profile["name"] != "Candidate"))
 has_matches = isinstance(load_json(MATCHES_FILE), list) and len(load_json(MATCHES_FILE)) > 0
 
 # ============================================
@@ -379,15 +386,16 @@ with col_left:
 
         if not st.session_state.get("_profile_built"):
             if st.button("🧠 Parse Resume & Build Profile", use_container_width=True):
-                with st.spinner("Extracting skills, name, and headline…"):
+                with st.spinner("Extracting skills, name, and headline..."):
                     try:
                         build_profile(save_path, output_path=PROFILE_FILE)
 
                         if os.path.exists(PROFILE_FILE):
-                            with open(PROFILE_FILE, "r") as f:
+                            with open(PROFILE_FILE, "r", encoding="utf-8") as f:
                                 saved = json.load(f)
                             st.session_state["_profile_built"] = True
 
+                            # Clear input field cache
                             for k in ("name_input", "headline_input", "skills_input"):
                                 st.session_state.pop(k, None)
 
@@ -399,8 +407,8 @@ with col_left:
                         else:
                             st.error("❌ Profile file was not created. Check your PDF.")
                     except Exception as e:
-                        st.error(f"❌ {e}")
-                        st.exception(e)
+                        st.error(f"❌ Parsing failed: {str(e)}")
+                        st.info("💡 Try entering your profile manually below, or use a different resume format.")
         else:
             st.info("✅ Resume parsed. Upload a new file to re-parse.")
     else:
@@ -436,6 +444,8 @@ with col_right:
                 unsafe_allow_html=True,
             )
             st.caption(f"{len(skills)} skills · parsed from resume")
+        else:
+            st.info("No skills extracted yet. Add them manually below to enable job matching.")
     else:
         st.markdown(
             '<p class="status-pending">No profile yet — upload a resume or fill in manually below.</p>',
@@ -450,6 +460,7 @@ with col_right:
             "Full Name",
             value=profile.get("name", ""),
             key="name_input",
+            placeholder="Your full name"
         )
         headline_input = st.text_input(
             "Professional Headline",
@@ -462,21 +473,30 @@ with col_right:
             value="\n".join(profile.get("skills", [])),
             height=150,
             key="skills_input",
+            placeholder="salesforce\nzendesk\ncustomer success\nsaas\n..."
         )
 
         if st.button("💾 Save Profile", use_container_width=True):
-            updated = {
-                "name": name_val,
-                "headline": headline_input,
-                "skills": [s.strip() for s in skills_input.split("\n") if s.strip()],
-            }
-            save_json(PROFILE_FILE, updated)
-            st.success("✅ Saved!")
-            for k in ("name_input", "headline_input", "skills_input"):
-                st.session_state.pop(k, None)
-            st.session_state.pop("_matching_done", None)
-            time.sleep(0.3)
-            st.rerun()
+            # Parse skills
+            skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
+            
+            if not skills_list and not name_val:
+                st.error("❌ Please enter at least a name or some skills")
+            else:
+                updated = {
+                    "name": name_val if name_val else "Candidate",
+                    "headline": headline_input,
+                    "skills": skills_list,
+                }
+                save_json(PROFILE_FILE, updated)
+                st.success("✅ Saved!")
+                
+                # Clear input cache
+                for k in ("name_input", "headline_input", "skills_input"):
+                    st.session_state.pop(k, None)
+                st.session_state.pop("_matching_done", None)
+                time.sleep(0.3)
+                st.rerun()
 
 # ============================================
 # JOB MATCHING SECTION
@@ -485,8 +505,12 @@ with col_right:
 st.markdown("---")
 st.markdown('<div class="section-card"><h3>🚀 Job Matching</h3>', unsafe_allow_html=True)
 
-if not has_profile:
-    st.info("Create a profile above to unlock job matching.")
+# Better validation for job matching
+profile_ready = bool(profile.get("skills") and len(profile.get("skills", [])) > 0)
+
+if not profile_ready:
+    st.info("⚠️ Add at least one skill to your profile above to unlock job matching.")
+    st.caption("Job matching uses your skills to find relevant positions. You can add them by parsing your resume or entering them manually.")
 else:
     # Optional jobs upload
     with st.expander("📁 Upload custom jobs.json (optional)"):
@@ -522,7 +546,7 @@ else:
             st.rerun()
 
     elif st.session_state.get("_matching_running"):
-        st.warning("⏳ Pipeline is running — please wait…")
+        st.warning("⏳ Pipeline is running — please wait...")
 
     else:
         st.markdown(
@@ -540,7 +564,7 @@ else:
                 log_lines.append(msg)
                 log_container.code("\n".join(log_lines[-20:]), language=None)
 
-            status_box.info("🔍 Fetching jobs and scoring matches… this takes 2–5 min.")
+            status_box.info("🔍 Fetching jobs and scoring matches... this takes 2-5 min.")
 
             try:
                 result = run_auto_apply_pipeline(
@@ -598,7 +622,7 @@ if isinstance(matches_data, list) and matches_data:
                 st.markdown(f"**{title}**")
                 st.caption(f"{company} · via {source}")
                 if job.get("summary"):
-                    st.write(job["summary"][:400] + ("…" if len(job.get("summary", "")) > 400 else ""))
+                    st.write(job["summary"][:400] + ("..." if len(job.get("summary", "")) > 400 else ""))
             with c2:
                 st.markdown(
                     f'<div style="text-align:center;margin-top:0.5rem;">'
