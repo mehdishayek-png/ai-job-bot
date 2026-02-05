@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 from openai import OpenAI
 from dotenv import load_dotenv
 from cover_letter_generator import generate_cover_letter
@@ -148,10 +147,26 @@ def main():
 
         log("No jobs file found. Running job fetcher...\n")
 
-        subprocess.run(["python", "job_fetcher.py"])
+        try:
+            # Import and run job_fetcher directly instead of subprocess
+            import job_fetcher
+            job_fetcher.main()
+            log("Job fetcher completed.\n")
+        except Exception as e:
+            log(f"Job fetcher error: {str(e)}\n")
+            try:
+                import streamlit as st
+                st.error(f"Job fetching failed: {str(e)}")
+            except ImportError:
+                pass
 
         if not os.path.exists(JOBS_FILE):
             log("Job fetch failed. Exiting.")
+            try:
+                import streamlit as st
+                st.warning("No jobs found. Job sources may be unavailable or filtered out all results.")
+            except ImportError:
+                pass
             return
 
     # ----------------------------------------
