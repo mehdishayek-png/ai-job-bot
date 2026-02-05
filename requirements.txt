@@ -1,6 +1,10 @@
 streamlit
-pdfplumber
-feedparser
 openai
+python-dotenv
+requests
+beautifulsoup4
+pandas
 numpy
 scikit-learn
+sentence-transformers
+pdfplumber
