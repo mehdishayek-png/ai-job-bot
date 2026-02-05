@@ -113,26 +113,42 @@ st.header("📄 Resume Upload")
 uploaded = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
 
 if uploaded:
+    # Save file only once per upload — use session state to track
     save_path = os.path.join(SESSION_DIR, uploaded.name)
-    with open(save_path, "wb") as f:
-        f.write(uploaded.read())
-    st.success("Resume uploaded successfully.")
+
+    if st.session_state.get("_uploaded_name") != uploaded.name:
+        file_bytes = uploaded.getvalue()  # getvalue() never exhausts the buffer
+        with open(save_path, "wb") as f:
+            f.write(file_bytes)
+        st.session_state["_uploaded_name"] = uploaded.name
+        st.session_state["_uploaded_path"] = save_path
+
+    save_path = st.session_state.get("_uploaded_path", save_path)
+    st.success(f"Resume uploaded: {uploaded.name}")
 
     if st.button("🧠 Build Profile From Resume"):
         with st.spinner("Parsing resume…"):
             try:
+                st.info(f"Parsing {save_path} → {PROFILE_FILE}")
                 build_profile(save_path, output_path=PROFILE_FILE)
-                st.success("✅ Profile built!")
 
-                # ===================================================
-                # FIX: Clear widget keys so text_input/text_area
-                # pick up the NEW profile values on rerun.
-                # Without this, Streamlit ignores value= because
-                # the old value is cached in session_state[key].
-                # ===================================================
+                # Verify the profile was actually saved
+                if os.path.exists(PROFILE_FILE):
+                    with open(PROFILE_FILE, "r") as f:
+                        saved = json.load(f)
+                    st.success(
+                        f"✅ Profile built! Name: {saved.get('name', '?')}, "
+                        f"Skills: {len(saved.get('skills', []))}"
+                    )
+                else:
+                    st.error("❌ Profile file was not created.")
+
+                # Clear widget keys so fields pick up new values
                 for k in ("name_input", "headline_input", "skills_input"):
                     st.session_state.pop(k, None)
 
+                import time
+                time.sleep(1)  # brief pause so user sees the success message
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Profile building failed: {e}")
