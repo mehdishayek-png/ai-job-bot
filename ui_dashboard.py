@@ -116,8 +116,6 @@ uploaded = st.file_uploader(
     type=["pdf"]
 )
 
-profile = load_json(PROFILE_FILE)
-
 if uploaded:
 
     save_path = os.path.join(SESSION_DIR, uploaded.name)
@@ -132,13 +130,25 @@ if uploaded:
         with st.spinner("Parsing resume..."):
 
             try:
+                # Update resume_parser to use session directory
+                import resume_parser
+                resume_parser.OUTPUT_PATH = PROFILE_FILE
+                
                 build_profile(save_path)
                 st.success("✅ Profile built successfully!")
-                profile = load_json(PROFILE_FILE)
+                
+                # Force reload the page to show extracted data
+                st.rerun()
                 
             except Exception as e:
                 st.error(f"❌ Profile building failed: {str(e)}")
                 st.exception(e)
+
+# ============================================
+# LOAD PROFILE (for display and editing)
+# ============================================
+
+profile = load_json(PROFILE_FILE)
 
 # ============================================
 # EXTRACTION RESULTS
@@ -175,24 +185,29 @@ else:
 
 st.header("👤 Editable Profile")
 
+# Initialize with empty values if no profile exists
 if not profile:
     profile = {"name": "", "skills": [], "headline": ""}
 
+# Form inputs - these will auto-populate if profile exists
 name = st.text_input(
     "Full Name",
-    value=profile.get("name", "")
+    value=profile.get("name", ""),
+    key="name_input"
 )
 
 headline = st.text_input(
     "Professional Headline",
-    value=profile.get("headline", "")
+    value=profile.get("headline", ""),
+    key="headline_input"
 )
 
 skills_text = st.text_area(
     "Skills / Keywords (one per line)",
     value="\n".join(profile.get("skills", [])),
     height=200,
-    help="Add skills that match the jobs you're targeting"
+    help="Add skills that match the jobs you're targeting",
+    key="skills_input"
 )
 
 if st.button("💾 Save Profile"):
