@@ -13,213 +13,308 @@ from dotenv import load_dotenv
 # ============================================
 
 st.set_page_config(
-    page_title="JobBot · AI Job Matcher",
-    page_icon="🎯",
+    page_title="JobBot · Your AI Job Hunter",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================
-# CUSTOM CSS — modern glassmorphism design
+# CUSTOM CSS — warm, energetic design
 # ============================================
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
 
 /* ---- Reset & Global ---- */
 .stApp {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'DM Sans', sans-serif;
 }
 h1, h2, h3, h4,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    font-family: 'Outfit', sans-serif !important;
+    font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
 }
 code, .stCode, pre {
-    font-family: 'JetBrains Mono', monospace !important;
+    font-family: 'Space Mono', monospace !important;
 }
 
-/* ---- Animated hero ---- */
+/* ---- Hero with floating orbs ---- */
 .hero {
-    background: linear-gradient(-45deg, #0f172a, #1e3a5f, #0d9488, #0ea5e9);
-    background-size: 400% 400%;
-    animation: heroShift 12s ease infinite;
-    padding: 2.8rem 2.2rem 2.2rem;
-    border-radius: 20px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #1a1a2e 100%);
+    padding: 2.4rem 2rem 1.8rem;
+    border-radius: 24px;
     margin-bottom: 1.2rem;
     position: relative;
     overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
 }
-@keyframes heroShift {
-    0%   { background-position: 0% 50%; }
-    50%  { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+.hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 60%;
+    height: 200%;
+    background: radial-gradient(ellipse, rgba(232, 121, 59, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    animation: orbFloat 8s ease-in-out infinite;
 }
 .hero::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 70% 20%, rgba(255,255,255,0.07) 0%, transparent 60%);
+    bottom: -30%;
+    left: -10%;
+    width: 50%;
+    height: 160%;
+    background: radial-gradient(ellipse, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
     pointer-events: none;
+    animation: orbFloat 10s ease-in-out infinite reverse;
 }
+@keyframes orbFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(20px, -15px) scale(1.05); }
+}
+.hero-content { position: relative; z-index: 1; }
 .hero h1 {
     color: #ffffff !important;
-    font-size: 2.2rem !important;
+    font-size: 2.4rem !important;
     font-weight: 800 !important;
-    margin: 0 0 0.25rem 0 !important;
-    letter-spacing: -0.03em;
+    margin: 0 0 0.2rem 0 !important;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
 }
+.hero h1 .accent { color: #e8793b; }
 .hero p {
-    color: rgba(255,255,255,0.7);
-    font-size: 0.95rem;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.9rem;
     margin: 0;
     font-weight: 400;
+    letter-spacing: 0.01em;
+}
+.hero .tag-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+    flex-wrap: wrap;
+}
+.hero .tag {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.55);
+    padding: 0.25rem 0.65rem;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
 
-/* ---- Welcome card ---- */
+/* ---- Welcome banner ---- */
 .welcome {
-    background: rgba(16, 185, 129, 0.08);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-    border-radius: 14px;
-    padding: 1.1rem 1.4rem;
+    background: linear-gradient(135deg, rgba(232,121,59,0.08), rgba(232,121,59,0.02));
+    border: 1px solid rgba(232,121,59,0.15);
+    border-radius: 16px;
+    padding: 1rem 1.3rem;
     margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.welcome-emoji {
+    font-size: 1.8rem;
+    line-height: 1;
 }
 .welcome h3 {
-    color: #10b981 !important;
-    margin: 0 0 0.15rem 0 !important;
-    font-size: 1.15rem !important;
-    font-weight: 600 !important;
+    color: #e8793b !important;
+    margin: 0 0 0.1rem 0 !important;
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
 }
 .welcome p {
-    color: #6ee7b7;
+    color: rgba(232,121,59,0.7);
     margin: 0;
-    font-size: 0.88rem;
+    font-size: 0.82rem;
     font-weight: 400;
 }
 
-/* ---- Glass cards ---- */
-.glass {
-    background: rgba(255,255,255,0.03);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 1.5rem;
+/* ---- Cards ---- */
+.card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px;
+    padding: 1.4rem;
     margin-bottom: 1rem;
+    transition: border-color 0.2s;
 }
-.glass h3 {
-    font-size: 1.05rem !important;
-    font-weight: 600 !important;
-    margin-bottom: 0.9rem !important;
-    letter-spacing: -0.01em;
+.card:hover {
+    border-color: rgba(232,121,59,0.2);
 }
+.card h3 {
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 0.8rem !important;
+    letter-spacing: -0.02em;
+}
+.card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+.card-icon.upload { background: rgba(99,102,241,0.12); }
+.card-icon.profile { background: rgba(232,121,59,0.12); }
+.card-icon.match { background: rgba(16,185,129,0.12); }
 
 /* ---- Skill chips ---- */
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
 .chip {
-    background: rgba(14,165,233,0.12);
-    color: #38bdf8;
-    padding: 0.28rem 0.7rem;
-    border-radius: 20px;
-    font-size: 0.78rem;
+    background: rgba(232,121,59,0.08);
+    color: #e8a76a;
+    padding: 0.25rem 0.65rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
     font-weight: 500;
-    border: 1px solid rgba(14,165,233,0.2);
+    border: 1px solid rgba(232,121,59,0.12);
     white-space: nowrap;
     transition: all 0.15s;
 }
 .chip:hover {
-    background: rgba(14,165,233,0.22);
+    background: rgba(232,121,59,0.16);
     transform: translateY(-1px);
 }
 
-/* ---- Step pills ---- */
-.steps { display: flex; justify-content: center; gap: 0.45rem; margin: 0.8rem 0 1.4rem; flex-wrap: wrap; }
-.pill {
-    padding: 0.35rem 0.85rem;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+/* ---- Progress stepper ---- */
+.stepper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    margin: 0.6rem 0 1.5rem;
 }
-.pill.done  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
-.pill.on    { background: rgba(14,165,233,0.15); color: #38bdf8; border: 1px solid rgba(14,165,233,0.3); }
-.pill.wait  { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.06); }
+.step {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.step.done .step-dot { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+.step.done { color: #6ee7b7; }
+.step.on .step-dot { background: #e8793b; box-shadow: 0 0 8px rgba(232,121,59,0.4); animation: pulse 2s ease infinite; }
+.step.on { color: #e8a76a; }
+.step.wait .step-dot { background: rgba(255,255,255,0.15); }
+.step.wait { color: rgba(255,255,255,0.25); }
+.step-line {
+    width: 28px;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
 
 /* ---- Score badges ---- */
 .score-hi {
     display: inline-block; background: linear-gradient(135deg,#059669,#10b981);
-    color: #fff; padding: 0.3rem 0.8rem; border-radius: 10px;
-    font-size: 0.9rem; font-weight: 700; letter-spacing: 0.02em;
+    color: #fff; padding: 0.3rem 0.75rem; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 700; letter-spacing: 0.02em;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.3);
 }
 .score-md {
     display: inline-block; background: linear-gradient(135deg,#d97706,#f59e0b);
-    color: #fff; padding: 0.3rem 0.8rem; border-radius: 10px;
-    font-size: 0.9rem; font-weight: 700;
+    color: #fff; padding: 0.3rem 0.75rem; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 700;
+    box-shadow: 0 2px 8px rgba(245,158,11,0.3);
 }
 .score-lo {
-    display: inline-block; background: linear-gradient(135deg,#6b7280,#9ca3af);
-    color: #fff; padding: 0.3rem 0.8rem; border-radius: 10px;
-    font-size: 0.9rem; font-weight: 700;
+    display: inline-block; background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6); padding: 0.3rem 0.75rem; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.1);
 }
 
 /* ---- Source badges ---- */
 .src-badge {
     display: inline-block;
-    padding: 0.2rem 0.55rem;
+    padding: 0.18rem 0.5rem;
     border-radius: 6px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
 }
-.src-wwr  { background: rgba(99,102,241,0.15); color: #818cf8; }
-.src-rok  { background: rgba(244,63,94,0.15); color: #fb7185; }
-.src-rem  { background: rgba(14,165,233,0.15); color: #38bdf8; }
-.src-other{ background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); }
+.src-wwr  { background: rgba(129,140,248,0.12); color: #a5b4fc; border: 1px solid rgba(129,140,248,0.15); }
+.src-rok  { background: rgba(251,113,133,0.12); color: #fda4af; border: 1px solid rgba(251,113,133,0.15); }
+.src-rem  { background: rgba(56,189,248,0.12); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.15); }
+.src-other{ background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.06); }
 
 /* ---- Cover letter box ---- */
 .cl-wrap {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
     border-radius: 12px;
     padding: 1rem 1.3rem;
-    margin-top: 0.8rem;
-    line-height: 1.65;
-    font-size: 0.88rem;
-    color: rgba(255,255,255,0.78);
+    margin-top: 0.6rem;
+    line-height: 1.7;
+    font-size: 0.86rem;
+    color: rgba(255,255,255,0.72);
     white-space: pre-wrap;
 }
 .cl-label {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.3);
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 /* ---- Stats row ---- */
-.stats-row { display: flex; gap: 0.8rem; margin-bottom: 1.2rem; flex-wrap: wrap; }
-.stat-card {
-    flex: 1;
-    min-width: 120px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 12px;
-    padding: 0.9rem 1rem;
-    text-align: center;
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
+    margin-bottom: 1.2rem;
 }
+.stat-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 1rem 0.8rem;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: rgba(232,121,59,0.2); }
 .stat-card .num {
-    font-size: 1.6rem;
+    font-size: 1.7rem;
     font-weight: 800;
     letter-spacing: -0.03em;
-    color: #38bdf8;
+    background: linear-gradient(135deg, #e8793b, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 .stat-card .lbl {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: rgba(255,255,255,0.4);
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-top: 0.15rem;
@@ -229,16 +324,41 @@ code, .stCode, pre {
 .stButton > button {
     border-radius: 12px !important;
     font-weight: 600 !important;
-    font-family: 'Outfit', sans-serif !important;
+    font-family: 'DM Sans', sans-serif !important;
     padding: 0.55rem 1.3rem !important;
+    transition: all 0.15s !important;
 }
+.stButton > button:hover {
+    transform: translateY(-1px) !important;
+}
+
+/* ---- Expanders ---- */
 div[data-testid="stExpander"] {
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
     border-radius: 14px !important;
     margin-bottom: 0.5rem !important;
+    transition: border-color 0.2s !important;
+}
+div[data-testid="stExpander"]:hover {
+    border-color: rgba(255,255,255,0.12) !important;
 }
 div[data-testid="stExpander"] summary {
     font-weight: 600 !important;
+}
+
+/* ---- Divider ---- */
+.soft-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    margin: 1.2rem 0;
+}
+
+/* ---- Footer ---- */
+.footer {
+    text-align: center;
+    padding: 1.5rem 0 0.5rem;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.2);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -337,7 +457,6 @@ def sanitize_filename(s, max_length=50):
 
 
 def find_cover_letter(company, title):
-    """Find cover letter matching a job, return (content, filename) or (None, None)."""
     if not os.path.exists(LETTERS_DIR):
         return None, None
     expected = f"{sanitize_filename(company)}__{sanitize_filename(title)}.txt"
@@ -348,7 +467,6 @@ def find_cover_letter(company, title):
                 return f.read(), expected
         except Exception:
             pass
-    # Fuzzy fallback
     sc = sanitize_filename(company).lower()
     st_part = sanitize_filename(title).lower()[:20]
     for fname in os.listdir(LETTERS_DIR):
@@ -374,7 +492,6 @@ def source_badge(source):
 
 
 def build_zip(letters_dir):
-    """Create ZIP of all cover letters."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         for fname in sorted(os.listdir(letters_dir)):
@@ -401,9 +518,6 @@ has_matches = isinstance(load_json(MATCHES_FILE), list) and len(load_json(MATCHE
 # ============================================
 # PRE-SEED EDIT FIELDS FROM PROFILE
 # ============================================
-# This is the critical fix — if the session_state keys don't
-# exist yet, seed them from the profile on disk. This way
-# the edit form is always pre-populated after a resume parse.
 
 if has_profile:
     if "name_input" not in st.session_state:
@@ -419,8 +533,15 @@ if has_profile:
 
 st.markdown("""
 <div class="hero">
-    <h1>🎯 JobBot</h1>
-    <p>AI-powered job matching · Resume parsing · Auto cover letters</p>
+    <div class="hero-content">
+        <h1>⚡ Job<span class="accent">Bot</span></h1>
+        <p>Smart matching · Instant cover letters · Zero busywork</p>
+        <div class="tag-row">
+            <span class="tag">Gemini 2.5 Flash</span>
+            <span class="tag">3 Job Boards</span>
+            <span class="tag">Keyword + AI Scoring</span>
+        </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -432,10 +553,14 @@ if has_profile and profile.get("name") and profile["name"] != "Candidate":
     skill_count = len(profile.get("skills", []))
     headline = profile.get("headline", "")
     sub = f"{headline} · " if headline else ""
+    first_name = profile["name"].split()[0] if profile["name"] else "there"
     st.markdown(f"""
     <div class="welcome">
-        <h3>Welcome back, {profile["name"]} 👋</h3>
-        <p>{sub}{skill_count} skills loaded</p>
+        <div class="welcome-emoji">👋</div>
+        <div>
+            <h3>Hey, {first_name}</h3>
+            <p>{sub}{skill_count} skills loaded · Ready to match</p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -449,11 +574,14 @@ p3 = "done" if has_matches else ("on" if has_profile else "wait")
 p4 = "done" if has_matches else "wait"
 
 st.markdown(f"""
-<div class="steps">
-    <span class="pill {p1}">{"✓" if has_profile else "1"} Upload</span>
-    <span class="pill {p2}">{"✓" if has_profile else "2"} Profile</span>
-    <span class="pill {p3}">{"✓" if has_matches else "3"} Match</span>
-    <span class="pill {p4}">{"✓" if has_matches else "4"} Letters</span>
+<div class="stepper">
+    <div class="step {p1}"><div class="step-dot"></div>Upload</div>
+    <div class="step-line"></div>
+    <div class="step {p2}"><div class="step-dot"></div>Profile</div>
+    <div class="step-line"></div>
+    <div class="step {p3}"><div class="step-dot"></div>Match</div>
+    <div class="step-line"></div>
+    <div class="step {p4}"><div class="step-dot"></div>Letters</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -476,6 +604,13 @@ with st.sidebar:
         "3. **Run matching** against live remote jobs\n"
         "4. **Read & download** tailored cover letters"
     )
+    st.divider()
+    st.markdown("### Engine")
+    st.markdown(
+        "**Phase 1** — Keyword matching (instant)  \n"
+        "**Phase 2** — Gemini 2.5 Flash scoring  \n"
+        "**Phase 3** — Seniority + diversity filters"
+    )
 
 # ============================================
 # TWO-COLUMN LAYOUT: Upload + Profile
@@ -488,7 +623,7 @@ col_left, col_right = st.columns([1, 1], gap="large")
 # ============================================
 
 with col_left:
-    st.markdown('<div class="glass"><h3>📄 Resume Upload</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><h3><span class="card-icon upload">📄</span> Resume</h3>', unsafe_allow_html=True)
 
     uploaded = st.file_uploader(
         "Drop your resume here",
@@ -510,32 +645,31 @@ with col_left:
         st.success(f"📎 {uploaded.name}")
 
         if not st.session_state.get("_profile_built"):
-            if st.button("🧠 Parse Resume & Build Profile", use_container_width=True):
-                with st.spinner("Extracting skills, name, and headline…"):
+            if st.button("🧠 Parse Resume", use_container_width=True):
+                with st.spinner("Extracting with Gemini 2.5 Flash…"):
                     try:
                         build_profile(save_path, output_path=PROFILE_FILE)
                         if os.path.exists(PROFILE_FILE):
                             with open(PROFILE_FILE, "r") as f:
                                 saved = json.load(f)
                             st.session_state["_profile_built"] = True
-                            # Pre-populate edit fields
                             st.session_state["name_input"] = saved.get("name", "")
                             st.session_state["headline_input"] = saved.get("headline", "")
                             st.session_state["skills_input"] = "\n".join(saved.get("skills", []))
                             n = saved.get("name", "Candidate")
                             sc = len(saved.get("skills", []))
-                            st.success(f"✅ {n} — {sc} skills extracted")
+                            st.success(f"✅ {n} — {sc} skills")
                             time.sleep(0.5)
                             st.rerun()
                         else:
-                            st.error("❌ Profile not created. Check your PDF.")
+                            st.error("Profile not created. Check your PDF.")
                     except Exception as e:
                         st.error(f"❌ {e}")
-                        st.info("Try entering your profile manually, or use a different resume.")
+                        st.info("Try entering your profile manually.")
         else:
             st.info("✅ Parsed. Upload a new file to re-parse.")
     else:
-        st.caption("PDF format · up to 200 MB")
+        st.caption("PDF format · Drag & drop or browse")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -544,7 +678,7 @@ with col_left:
 # ============================================
 
 with col_right:
-    st.markdown('<div class="glass"><h3>👤 Your Profile</h3>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><h3><span class="card-icon profile">👤</span> Profile</h3>', unsafe_allow_html=True)
 
     if has_profile:
         display_name = profile.get("name", "Candidate")
@@ -561,11 +695,11 @@ with col_right:
             st.markdown(f'<div class="chips">{chips}</div>', unsafe_allow_html=True)
             st.caption(f"{len(skills)} skills · from resume")
     else:
-        st.caption("No profile yet — upload a resume or create one manually below.")
+        st.caption("No profile yet — upload a resume or create one below.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---- Edit form — ALWAYS pre-populated ----
+    # ---- Edit form ----
     with st.expander(
         "✏️ Edit profile" if has_profile else "✏️ Create profile manually",
         expanded=not has_profile,
@@ -596,8 +730,8 @@ with col_right:
 # JOB MATCHING
 # ============================================
 
-st.markdown("---")
-st.markdown('<div class="glass"><h3>🚀 Job Matching</h3>', unsafe_allow_html=True)
+st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
+st.markdown('<div class="card"><h3><span class="card-icon match">🚀</span> Job Matching</h3>', unsafe_allow_html=True)
 
 profile_ready = bool(profile.get("skills"))
 
@@ -616,7 +750,7 @@ else:
                 st.error(f"Invalid JSON: {e}")
 
     if st.session_state.get("_matching_done"):
-        st.success("✅ Matching complete — results below.")
+        st.success("✅ Matching complete — scroll down for results.")
         if st.button("🔄 Re-run with fresh jobs"):
             st.session_state.pop("_matching_done", None)
             st.session_state.pop("_matching_running", None)
@@ -633,8 +767,8 @@ else:
 
     else:
         st.markdown(
-            "Scans **WeWorkRemotely**, **RemoteOK** & **Remotive** "
-            "and scores each role against your profile."
+            "Scans **WeWorkRemotely**, **RemoteOK** & **Remotive**, "
+            "filters by keyword match, then scores top candidates with Gemini."
         )
         if st.button("▶ Start Matching", type="primary", use_container_width=True):
             st.session_state["_matching_running"] = True
@@ -644,9 +778,9 @@ else:
 
             def _progress(msg):
                 lines.append(msg)
-                log_box.code("\n".join(lines[-20:]), language=None)
+                log_box.code("\n".join(lines[-15:]), language=None)
 
-            status.info("🔍 Fetching & scoring… this takes 2–5 min.")
+            status.info("🔍 Fetching jobs & matching…")
             try:
                 result = run_auto_apply_pipeline(
                     profile_file=PROFILE_FILE,
@@ -662,7 +796,7 @@ else:
                 if result and result.get("status") == "success":
                     status.success(f"✅ {result['matches']} matches from {result['total_scored']} jobs")
                 elif result and result.get("status") == "no_matches":
-                    status.warning("No strong matches. Try adding more skills.")
+                    status.warning("No strong matches found. Try broadening your skills.")
                 else:
                     status.error(f"Pipeline: {result}")
                 time.sleep(1)
@@ -675,15 +809,15 @@ else:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# MATCH RESULTS — with stats + embedded cover letters
+# MATCH RESULTS
 # ============================================
 
 matches_data = load_json(MATCHES_FILE)
 
 if isinstance(matches_data, list) and matches_data:
-    st.markdown("---")
+    st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
 
-    # ---- Stats summary ----
+    # ---- Stats ----
     scores = [j.get("match_score", 0) for j in matches_data]
     avg_score = sum(scores) / len(scores) if scores else 0
     sources = {}
@@ -695,7 +829,7 @@ if isinstance(matches_data, list) and matches_data:
     if os.path.exists(LETTERS_DIR):
         letter_files = [f for f in os.listdir(LETTERS_DIR) if f.endswith(".txt")]
 
-    stats_html = f"""
+    st.markdown(f"""
     <div class="stats-row">
         <div class="stat-card">
             <div class="num">{len(matches_data)}</div>
@@ -707,32 +841,31 @@ if isinstance(matches_data, list) and matches_data:
         </div>
         <div class="stat-card">
             <div class="num">{len(letter_files)}</div>
-            <div class="lbl">Cover Letters</div>
+            <div class="lbl">Letters</div>
         </div>
         <div class="stat-card">
             <div class="num">{len(sources)}</div>
             <div class="lbl">Sources</div>
         </div>
     </div>
-    """
-    st.markdown(stats_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # ---- Download all as ZIP ----
+    # ---- Download ZIP ----
     if letter_files:
         col_title, col_zip = st.columns([3, 1])
         with col_title:
-            st.markdown(f"### 📊 Top {len(matches_data)} Matches")
+            st.markdown(f"### Your Top {len(matches_data)} Matches")
         with col_zip:
             zip_buf = build_zip(LETTERS_DIR)
             st.download_button(
-                "📦 Download All Letters (ZIP)",
+                "📦 Download All Letters",
                 data=zip_buf,
                 file_name="cover_letters.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
     else:
-        st.markdown(f"### 📊 Top {len(matches_data)} Matches")
+        st.markdown(f"### Your Top {len(matches_data)} Matches")
 
     # ---- Match cards ----
     for i, job in enumerate(matches_data, 1):
@@ -745,10 +878,9 @@ if isinstance(matches_data, list) and matches_data:
         if len(clean_summary) > 400:
             clean_summary = clean_summary[:400] + "…"
 
-        # Score badge class
-        if score >= 85:
+        if score >= 80:
             badge = f'<span class="score-hi">{score}%</span>'
-        elif score >= 70:
+        elif score >= 65:
             badge = f'<span class="score-md">{score}%</span>'
         else:
             badge = f'<span class="score-lo">{score}%</span>'
@@ -756,7 +888,6 @@ if isinstance(matches_data, list) and matches_data:
         src_html = source_badge(source)
 
         with st.expander(f"#{i}  ·  {company} — {title}  ({score}%)"):
-            # ---- Header row ----
             c1, c2 = st.columns([4, 1])
             with c1:
                 st.markdown(f"**{title}**")
@@ -774,7 +905,7 @@ if isinstance(matches_data, list) and matches_data:
                 if job.get("apply_url"):
                     st.link_button("🔗 Apply", job["apply_url"], use_container_width=True)
 
-            # ---- Embedded cover letter ----
+            # ---- Cover letter ----
             cl_content, cl_fname = find_cover_letter(company, title)
             if cl_content:
                 st.markdown("---")
@@ -793,8 +924,9 @@ if isinstance(matches_data, list) and matches_data:
 # FOOTER
 # ============================================
 
-st.markdown("---")
-st.caption(
-    "Built with Streamlit & OpenRouter · Each session is fully isolated · "
-    "Click **Start Fresh** in the sidebar to begin again."
-)
+st.markdown("""
+<div class="footer">
+    Built with Streamlit & Gemini 2.5 Flash · Each session is fully isolated ·
+    Click <b>Start Fresh</b> in the sidebar to begin again
+</div>
+""", unsafe_allow_html=True)
