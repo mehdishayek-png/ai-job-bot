@@ -47,11 +47,17 @@ client = OpenAI(
 # CONFIGURATION
 # ============================================
 
-MODEL = os.getenv("SCORING_MODEL", "mistralai/mistral-7b-instruct")
-MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
-API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))  # seconds between calls
-
+# ============================================
+# CONFIG
+# ============================================
+MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-thinking-exp:free")
+MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))  # Accept 70+ scores
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "30"))  # Show top 30 results
+API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.3"))  # Faster requests
+MAX_LLM_CANDIDATES = int(os.getenv("MAX_LLM_CANDIDATES", "50"))  # Score top 50 jobs
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "5"))  # ✅ Keep at 5
+MAX_PER_COMPANY = 3  # ✅ Keep at 3
+  # seconds between calls
 # ============================================
 # UTILITIES
 # ============================================
