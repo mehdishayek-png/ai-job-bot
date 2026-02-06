@@ -90,7 +90,12 @@ def extract_headline(lines):
 def extract_profile_with_llm(text):
     prompt = f"""You are an expert recruiter. Extract this candidate's profile.
 
-Return JSON with FOUR keys: "name", "headline", "skills", "role_keywords"
+Return JSON with FIVE keys: "name", "headline", "skills", "role_keywords", "experience_years"
+
+=== EXPERIENCE_YEARS (integer) ===
+Estimate total years of professional experience from work history dates.
+Count from earliest job start year to present. Internships count as 0.5 years.
+Return an integer. If unsure, estimate conservatively (round down).
 
 === SKILLS (8-12 items) ===
 Specific tools, platforms, and methodologies that would appear as REQUIREMENTS in job postings.
@@ -123,7 +128,7 @@ Think: if a recruiter searched for candidates, what job FUNCTIONS would they sea
 
 === FORMAT ===
 Return ONLY valid JSON:
-{{"name": "...", "headline": "...", "skills": ["8-12 items"], "role_keywords": ["5-8 items"]}}
+{{"name": "...", "headline": "...", "skills": ["8-12 items"], "role_keywords": ["5-8 items"], "experience_years": 3}}
 All lowercase. No duplicates.
 
 Resume:
@@ -152,6 +157,7 @@ JSON:"""
         data.setdefault("headline", "")
         data.setdefault("skills", [])
         data.setdefault("role_keywords", [])
+        data.setdefault("experience_years", 2)
 
         # Clean skills
         garbage = {
