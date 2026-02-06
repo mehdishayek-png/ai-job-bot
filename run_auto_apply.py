@@ -1,12 +1,12 @@
 """
-JobBot Matching Engine v6
-
+JobBot Matching Engine v5
 =========================
-Fixes:
-- Domain detection now prioritizes headline over tool names
-- Debug logging for pre-filter rejections
-- Expanded CX synonym groups
-- Better relevance scoring for CX roles
+Fixes from user testing:
+- Seniority detection: "GTM Strategy Lead" should NOT match a 2yr candidate
+- Location filter: India + Remote first, everything else deprioritized
+- Company diversity: max 3 matches per company
+- 25 results shown (was 15)
+- LLM prompt includes experience level for proper scoring
 """
 
 import json
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ============================================
 # API CLIENT
 # ============================================
+
 load_dotenv()
 api_key = os.getenv("OPENROUTER_API_KEY")
 if not api_key:
@@ -33,7 +34,6 @@ if not api_key:
         api_key = st.secrets.get("OPENROUTER_API_KEY")
     except (ImportError, KeyError, AttributeError):
         pass
-
 if not api_key:
     raise ValueError("OPENROUTER_API_KEY not found.")
 
@@ -42,17 +42,20 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # ============================================
 # CONFIG
 # ============================================
+
 MODEL = os.getenv("SCORING_MODEL", "mistralai/mistral-7b-instruct")
-MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))  # Lowered from 78
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "30"))  # Increased from 25
+MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "78"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
-MAX_LLM_CANDIDATES = int(os.getenv("MAX_LLM_CANDIDATES", "50"))  # Increased from 40
+MAX_LLM_CANDIDATES = int(os.getenv("MAX_LLM_CANDIDATES", "40"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "5"))
 MAX_PER_COMPANY = 3
+
 
 # ============================================
 # SENIORITY DETECTION
 # ============================================
+
 def estimate_experience_years(profile):
     # First check explicit field from parser
     explicit = profile.get("experience_years")
@@ -60,6 +63,7 @@ def estimate_experience_years(profile):
         return int(explicit)
 
     headline = (profile.get("headline", "") or "").lower()
+
     years_match = re.search(r'(\d+)\+?\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|hands-on)?', headline)
     if years_match:
         return int(years_match.group(1))
@@ -80,6 +84,7 @@ def estimate_experience_years(profile):
     skills = profile.get("skills", [])
     return min(3, len(skills) // 3)
 
+
 SENIOR_TITLE_MARKERS = [
     "lead", "head of", "head,", "director", "vp ", "vice president",
     "principal", "chief", "c-level", "cto", "coo", "ceo", "cfo",
@@ -91,6 +96,7 @@ MID_TITLE_MARKERS = [
     "senior", "sr ", "sr.", "manager", "team lead",
 ]
 
+
 def title_seniority_level(title):
     t = title.lower()
     if any(m in t for m in SENIOR_TITLE_MARKERS):
@@ -98,6 +104,7 @@ def title_seniority_level(title):
     if any(m in t for m in MID_TITLE_MARKERS):
         return "mid"
     return "any"
+
 
 def seniority_mismatch_penalty(job_title, candidate_years):
     job_level = title_seniority_level(job_title)
@@ -109,9 +116,11 @@ def seniority_mismatch_penalty(job_title, candidate_years):
         return -0.2
     return 0.0
 
+
 # ============================================
 # LOCATION FILTER
 # ============================================
+
 INDIA_SIGNALS = [
     "india", "bangalore", "bengaluru", "mumbai", "delhi",
     "hyderabad", "pune", "chennai", "kolkata", "gurgaon",
@@ -121,9 +130,9 @@ INDIA_SIGNALS = [
 
 REMOTE_SIGNALS = [
     "remote", "work from home", "wfh", "anywhere",
-    "distributed", "fully remote", "remote-first", "work remotely",
-    "location independent", "virtual", "telecommute",
+    "distributed", "fully remote", "remote-first",
 ]
+
 
 def classify_location(job):
     loc = (job.get("location", "") or "").lower()
@@ -137,109 +146,61 @@ def classify_location(job):
         return "remote"
     return "other"
 
-# ============================================
-# SYNONYM / FUNCTION EXPANSION (ENHANCED)
-# ============================================
-SYNONYM_GROUPS = [
-    # ENHANCED: Customer Experience / Support (PRIMARY GROUP)
-    {"customer support", "customer service", "customer experience", "customer success",
-     "client support", "client success", "client services", "cx specialist", "cx operations",
-     "customer care", "user support", "customer operations", "support operations",
-     "customer ops", "experience management", "customer journey", "client experience",
-     "user experience operations", "customer satisfaction", "client care"},
 
-    # ENHANCED: Incident & Escalation Management
+# ============================================
+# SYNONYM / FUNCTION EXPANSION
+# ============================================
+
+SYNONYM_GROUPS = [
+    {"customer support", "customer service", "customer experience", "customer success",
+     "client support", "client success", "client services",
+     "customer care", "user support", "customer operations"},
     {"incident management", "incident triage", "incident response",
      "escalation management", "ticket escalation", "issue resolution",
      "issue management", "ticket triage", "case management",
-     "escalation handling", "problem management", "critical incidents",
-     "p1 incidents", "p2 incidents", "operational support", "ops escalation",
-     "issue tracking", "incident coordination"},
-
+     "escalation handling", "problem management"},
     {"ticketing", "help desk", "helpdesk", "service desk",
      "ticket management", "support tickets", "case handling"},
-
-    # Account Management
     {"account management", "account manager", "key accounts",
      "client relationship", "relationship management",
      "customer retention", "churn management", "renewal management"},
-
-    # Onboarding & Implementation
     {"customer onboarding", "client onboarding", "user onboarding",
-     "implementation", "customer implementation", "product adoption",
-     "user adoption", "onboarding specialist"},
-
-    # Technical Support
+     "implementation", "customer implementation", "product adoption"},
     {"technical support", "tech support", "technical troubleshooting",
      "technical assistance", "product support", "application support",
      "l1 support", "l2 support", "tier 1", "tier 2"},
-
-    # SLA & Operations
     {"sla management", "sla compliance", "service level agreement",
      "tat management", "response time", "resolution time"},
-
-    # Process & Workflow
     {"process optimization", "process improvement", "workflow design",
      "sop development", "standard operating procedures",
-     "operational excellence", "ops management", "process documentation",
-     "workflow optimization", "operations coordination"},
-
-    # RCA & Quality
+     "operational excellence", "ops management"},
     {"root cause analysis", "rca", "post-mortem", "post mortem",
      "postmortem", "retrospective", "incident review"},
-
-    # Collaboration
     {"cross-functional coordination", "cross-functional collaboration",
-     "stakeholder management", "stakeholder communication",
-     "internal coordination", "team collaboration"},
-
-    # Tools: Ticketing/Support
+     "stakeholder management", "stakeholder communication"},
     {"zendesk", "freshdesk", "intercom", "helpscout", "freshservice",
      "jira service management", "servicenow", "salesforce service cloud"},
-
-    # Tools: Project Management
     {"jira", "linear", "asana", "monday.com", "clickup", "trello"},
-
-    # Tools: Identity & Access
     {"okta", "sso", "single sign-on", "identity management",
      "identity access management", "iam", "authentication"},
-
-    # Tools: Automation
     {"workato", "zapier", "automation", "workflow automation",
      "process automation", "integration platform"},
-
-    # SaaS
     {"saas", "software as a service", "b2b saas", "enterprise saas",
      "cloud software"},
-
-    # Product Operations
     {"product operations", "product ops", "product support",
-     "product feedback", "beta testing", "uat", "user acceptance testing"},
-
-    # Analytics & Reporting
+     "product feedback", "beta testing", "uat"},
     {"data analysis", "reporting", "analytics", "metrics",
      "kpi tracking", "dashboard", "business intelligence"},
-
-    # Engineering
     {"software engineer", "software developer", "programmer",
      "full stack developer", "backend developer", "frontend developer"},
-
     {"ci/cd", "continuous integration", "continuous deployment",
      "devops", "infrastructure"},
-
-    # Marketing
     {"seo", "search engine optimization", "sem", "search marketing"},
     {"content marketing", "content strategy", "copywriting", "content creation"},
     {"lead generation", "pipeline development", "prospecting", "outbound sales"},
-
-    # CRM
     {"crm", "salesforce", "hubspot crm", "pipedrive"},
-
-    # HR
     {"recruiting", "talent acquisition", "hiring", "sourcing candidates"},
     {"employee engagement", "people operations", "hr operations"},
-
-    # Data
     {"sql", "database", "data warehousing", "etl", "data pipeline"},
 ]
 
@@ -248,6 +209,7 @@ for group in SYNONYM_GROUPS:
     for term in group:
         _SYNONYM_MAP[term] = group
 
+
 def expand_terms(terms):
     expanded = set()
     for t in terms:
@@ -255,7 +217,6 @@ def expand_terms(terms):
         expanded.add(t_lower)
         if t_lower in _SYNONYM_MAP:
             expanded.update(_SYNONYM_MAP[t_lower])
-        # Also check substring matches
         for group in SYNONYM_GROUPS:
             for syn in group:
                 if t_lower in syn or syn in t_lower:
@@ -263,11 +224,13 @@ def expand_terms(terms):
                     break
     return expanded
 
+
 # ============================================
 # LANGUAGE / DOMAIN FILTERS
 # ============================================
+
 NON_ENGLISH_MARKERS = [
-    "mwd", "vollzeit", "teilzeit", "praktikum",
+    "(m/w/d)", "vollzeit", "teilzeit", "praktikum",
     "estagiário", "estágio", "desenvolvedor", "analista de",
     "desarrollador", "ingeniero de", "practicante",
     "développeur", "ingénieur", "stagiaire",
@@ -283,33 +246,34 @@ HARD_TECH_TITLES = [
     "ruby developer", "python developer", "java developer",
     "golang developer", "rust developer", "php developer",
     ".net developer", "c++ developer", "c# developer",
-    "firmware engineer", "embedded engineer", "security engineer",
-    "cloud engineer", "solutions architect", "software architect",
-    "principal engineer", "staff engineer",
+    "firmware engineer", "embedded engineer",
+    "security engineer", "cloud engineer", "solutions architect",
+    "software architect", "principal engineer", "staff engineer",
 ]
 
 NON_TECH_HEADLINES = [
     "customer success", "customer experience", "account manager",
     "operations", "project manager", "program manager",
-    "marketing", "sales", "business development",
-    "recruiter", "hr ", "human resources", "people operations",
-    "content", "copywriter", "social media", "support",
-    "community", "partnerships", "finance", "accounting",
-    "legal", "product operations", "cx ", "incident",
+    "marketing", "sales", "business development", "recruiter",
+    "hr ", "human resources", "people operations",
+    "content", "copywriter", "social media",
+    "support", "community", "partnerships",
+    "finance", "accounting", "legal",
+    "product operations", "cx ", "incident",
 ]
 
+
 def is_non_english(title, summary):
-    text = f"{title} {summary}".lower()
+    text = (title + " " + summary).lower()
     return any(m in text for m in NON_ENGLISH_MARKERS)
 
-def is_profile_nontechnical(profile):
+def is_profile_non_technical(profile):
     headline = (profile.get("headline", "") or "").lower()
     if any(nt in headline for nt in NON_TECH_HEADLINES):
         return True
-
-    tech_kw = ["python", "javascript", "typescript", "react", "node",
-               "java", "golang", "rust", "c++", "c#", "ruby", "php",
-               "sql", "aws", "docker", "kubernetes", "terraform", "git", "linux"]
+    tech_kw = {"python", "javascript", "typescript", "react", "node", "java",
+               "golang", "rust", "c++", "c#", "ruby", "php", "sql", "aws",
+               "docker", "kubernetes", "terraform", "git", "linux"}
     skills = [s.lower() for s in profile.get("skills", [])]
     tc = sum(1 for s in skills if any(t in s for t in tech_kw))
     return len(skills) > 0 and tc / len(skills) < 0.2
@@ -317,82 +281,59 @@ def is_profile_nontechnical(profile):
 def is_hard_tech_role(title):
     return any(ht in title.lower() for ht in HARD_TECH_TITLES)
 
-# ============================================
-# DOMAIN INFERENCE (FIXED)
-# ============================================
 def infer_candidate_domain(profile):
-    """
-    Infer candidate's primary domain with HEADLINE-FIRST approach.
-    Fixes issue where tool names (Zendesk, Okta) were overriding CX identity.
-    """
+    """Infer candidate's primary domain with HEADLINE-FIRST approach."""
     headline = (profile.get("headline", "") or "").lower()
     skills = [s.lower() for s in profile.get("skills", [])]
     role_kw = [s.lower() for s in profile.get("role_keywords", [])]
-
-    # HEADLINE gets 3x weight - this is the candidate's self-identification
+    
+    # HEADLINE gets 3x weight - this is self-identification
     headline_weight = 3
-
+    
     domain_signals = {
         "Customer Success / CX": [
             "customer success", "customer experience", "cx", "cx specialist",
             "customer support", "customer service", "customer care",
-            "client success", "client experience", "support operations",
-            "customer operations", "customer ops", "nps", "csat",
-            "churn", "retention", "onboarding"
+            "client success", "support operations", "customer ops"
         ],
         "Operations": [
             "operations", "operational", "project manage", "process",
-            "workflow", "sla", "escalation", "triage", "incident",
-            "ops manager", "operations manager", "operations specialist"
+            "workflow", "ops manager"
         ],
         "Technical Support": [
             "technical support", "tech support", "troubleshoot",
-            "troubleshooting", "helpdesk", "help desk", "tier 1",
-            "tier 2", "l1 support", "l2 support"
+            "helpdesk", "tier 1", "tier 2"
         ],
-        "Product": [
-            "product manage", "product ops", "product owner",
-            "product operations", "roadmap", "beta testing", "uat",
-            "product specialist"
-        ],
-        "Sales": ["sales", "business development", "bdr", "sdr", "revenue"],
-        "Marketing": ["marketing", "content", "seo", "social media", "brand"],
-        "Engineering": [
-            "software engineer", "developer", "full stack", "backend",
-            "frontend", "devops", "programming"
-        ],
+        "Product": ["product manage", "product ops", "product owner"],
+        "Sales": ["sales", "business development", "bdr", "sdr"],
+        "Marketing": ["marketing", "content", "seo"],
+        "Engineering": ["software engineer", "developer", "backend", "frontend"],
     }
-
+    
     domain_scores = {}
-
     for domain, signals in domain_signals.items():
-        # Count headline matches with 3x weight
         headline_hits = sum(1 for s in signals if s in headline) * headline_weight
-
-        # Count skill/role keyword matches
         combined_text = " ".join(skills + role_kw)
         skill_hits = sum(1 for s in signals if s in combined_text)
-
         total_score = headline_hits + skill_hits
-
         if total_score > 0:
             domain_scores[domain] = total_score
-
-    # Return highest scoring domain
+    
     if domain_scores:
         sorted_domains = sorted(domain_scores.items(), key=lambda x: x[1], reverse=True)
         logger.info(f"Domain scores: {sorted_domains[:3]}")
         return sorted_domains[0][0]
-
-    # Default to Customer Experience for support/ops profiles
-    if any(kw in headline for kw in ["support", "success", "experience", "operations", "specialist"]):
+    
+    if any(kw in headline for kw in ["support", "success", "experience", "operations"]):
         return "Customer Success / CX"
-
+    
     return "General Professional"
 
+
 # ============================================
-# RELEVANCE SCORING (ENHANCED)
+# LOCAL SCORING
 # ============================================
+
 def local_relevance_score(job, profile, candidate_years):
     skills = [s.lower().strip() for s in profile.get("skills", []) if s]
     role_kw = [s.lower().strip() for s in profile.get("role_keywords", []) if s]
@@ -401,128 +342,84 @@ def local_relevance_score(job, profile, candidate_years):
     if not all_terms:
         return {"skill_hits": 0, "role_hits": 0, "composite": 0.0, "location": "other"}
 
-    job_text = f"{job.get('title', '')} {job.get('summary', '')}".lower()
+    job_text = (job.get("title", "") + " " + job.get("summary", "")).lower()
     job_title = job.get("title", "").lower()
-
-    # Expand terms with synonyms
     expanded = expand_terms(all_terms)
 
-    # Count skill hits (direct matches)
     skill_hits = sum(1 for s in skills if s in job_text) if skills else 0
 
-    # Count role keyword hits (expanded with synonyms)
     role_hits = 0
     for term in expanded:
         if len(term) > 3 and term in job_text:
             role_hits += 1
     role_hits = min(role_hits, 10)
 
-    # Title overlap
     headline = (profile.get("headline", "") or "").lower()
     headline_words = set(w for w in headline.split() if len(w) > 3)
     title_words = set(w for w in job_title.split() if len(w) > 3)
     title_overlap = len(headline_words & title_words) / len(headline_words) if headline_words else 0.0
 
-    # Function keyword bonus (CX-specific terms)
-    fn_keywords = [
-        "manager", "specialist", "analyst", "coordinator", "associate",
-        "customer", "success", "experience", "operations", "support",
-        "technical", "account", "product", "incident", "service"
-    ]
+    fn_keywords = ["manager", "specialist", "analyst", "coordinator", "associate",
+                   "customer", "success", "experience", "operations", "support",
+                   "technical", "account", "product", "incident", "service"]
     fn_bonus = sum(0.08 for kw in fn_keywords if kw in headline and kw in job_title)
     fn_bonus = min(fn_bonus, 0.3)
 
-    # Seniority penalty
     seniority_pen = seniority_mismatch_penalty(job.get("title", ""), candidate_years)
 
-    # Location boost
     loc_class = classify_location(job)
-    loc_boost = 0.15 if loc_class == "india" else 0.10 if loc_class == "remote" else 0.0
+    loc_boost = 0.15 if loc_class == "india" else (0.10 if loc_class == "remote" else 0.0)
 
-    # Normalize scores
     role_norm = min(role_hits / 5.0, 1.0)
     skill_norm = skill_hits / len(skills) if skills else 0.0
 
-    # ADJUSTED WEIGHTS: Role keywords more important for CX matching
-    composite = (
-        skill_norm * 0.25 +          # Reduced from 0.30
-        role_norm * 0.35 +           # Increased from 0.25
-        title_overlap * 0.15 +
-        fn_bonus * 0.10 +
-        loc_boost +
-        seniority_pen
-    )
+    composite = (skill_norm * 0.30) + (role_norm * 0.25) + (title_overlap * 0.15) + (fn_bonus * 0.10) + loc_boost + seniority_pen
 
     return {
-        "skill_hits": skill_hits,
-        "role_hits": role_hits,
+        "skill_hits": skill_hits, "role_hits": role_hits,
         "title_overlap": round(title_overlap, 3),
         "seniority_pen": round(seniority_pen, 3),
         "location": loc_class,
         "composite": round(max(composite, 0), 3),
     }
 
-# ============================================
-# PRE-FILTER (WITH DEBUG LOGGING)
-# ============================================
-def prefilter_jobs(jobs, profile, candidate_years, progress_callback=None):
-    nontech = is_profile_nontechnical(profile)
-    passed = []
-    stats = {
-        "non_english": 0, "wrong_domain": 0,
-        "low_relevance": 0, "wrong_location": 0,
-        "too_senior": 0, "passed": 0
-    }
 
-    rejected_samples = []  # Track first 15 rejections for debugging
+# ============================================
+# PRE-FILTER
+# ============================================
+
+def prefilter_jobs(jobs, profile, candidate_years, progress_callback=None):
+    non_tech = is_profile_non_technical(profile)
+    passed = []
+    stats = {"non_english": 0, "wrong_domain": 0, "low_relevance": 0,
+             "wrong_location": 0, "too_senior": 0, "passed": 0}
 
     for job in jobs:
         title = job.get("title", "")
         summary = job.get("summary", "")
-        company = job.get("company", "Unknown")
 
-        # Check non-English
         if is_non_english(title, summary):
             stats["non_english"] += 1
-            if len(rejected_samples) < 15:
-                rejected_samples.append(f"  ❌ {company} - {title[:50]} | REASON: Non-English")
             continue
 
-        # Check hard-tech filter
-        if nontech and is_hard_tech_role(title):
+        if non_tech and is_hard_tech_role(title):
             stats["wrong_domain"] += 1
-            if len(rejected_samples) < 15:
-                rejected_samples.append(f"  ❌ {company} - {title[:50]} | REASON: Hard-tech role")
             continue
 
-        # Check location
         loc_class = classify_location(job)
         if loc_class == "other":
             stats["wrong_location"] += 1
-            if len(rejected_samples) < 15:
-                loc_display = job.get("location", "N/A")[:30]
-                rejected_samples.append(f"  ❌ {company} - {title[:50]} | REASON: Location ({loc_display})")
             continue
 
-        # Check seniority
         if candidate_years < 3 and title_seniority_level(title) == "senior":
             stats["too_senior"] += 1
-            if len(rejected_samples) < 15:
-                rejected_samples.append(f"  ❌ {company} - {title[:50]} | REASON: Too senior")
             continue
 
-        # Relevance scoring
         rel = local_relevance_score(job, profile, candidate_years)
-        passes = (rel["skill_hits"] >= 1 or rel["role_hits"] >= 2 or rel.get("title_overlap", 0) >= 0.25)
 
+        passes = (rel["skill_hits"] >= 1 or rel["role_hits"] >= 2 or rel.get("title_overlap", 0) >= 0.3)
         if not passes:
             stats["low_relevance"] += 1
-            if len(rejected_samples) < 15:
-                rejected_samples.append(
-                    f"  ❌ {company} - {title[:50]} | REASON: Low relevance "
-                    f"(skills:{rel['skill_hits']}, roles:{rel['role_hits']}, "
-                    f"composite:{rel['composite']:.2f})"
-                )
             continue
 
         job["_local"] = rel
@@ -534,40 +431,31 @@ def prefilter_jobs(jobs, profile, candidate_years, progress_callback=None):
     if len(passed) > MAX_LLM_CANDIDATES:
         passed = passed[:MAX_LLM_CANDIDATES]
 
-    # Log detailed breakdown
-    logger.info("=" * 80)
-    logger.info(f"PRE-FILTER RESULTS: {len(jobs)} → {stats['passed']} passed (top {len(passed)} to LLM)")
-    logger.info(f"  ✓ Passed: {stats['passed']}")
-    logger.info(f"  ✗ Filtered out: {stats['wrong_location']} location, "
-                f"{stats['too_senior']} seniority, {stats['low_relevance']} relevance, "
-                f"{stats['non_english']} language, {stats['wrong_domain']} domain")
-
-    if rejected_samples:
-        logger.info("
-Sample rejections (first 15):")
-        for sample in rejected_samples:
-            logger.info(sample)
-
-    logger.info("=" * 80)
-
+    logger.info(
+        f"Pre-filter: {len(jobs)} → {stats['passed']} passed → {len(passed)} capped "
+        f"({stats['non_english']} lang, {stats['wrong_domain']} domain, "
+        f"{stats['wrong_location']} location, {stats['too_senior']} seniority, "
+        f"{stats['low_relevance']} relevance)"
+    )
     if progress_callback:
         progress_callback(
-            f"Pre-filter: {len(jobs)} → {stats['passed']} passed → top {len(passed)} to LLM
-"
-            f"Filtered: {stats['wrong_location']} wrong location, "
-            f"{stats['too_senior']} too senior, {stats['low_relevance']} low relevance"
+            f"Pre-filter: {len(jobs)} → {stats['passed']} relevant → top {len(passed)} to LLM "
+            f"(filtered: {stats['wrong_location']} wrong location, "
+            f"{stats['too_senior']} too senior, {stats['low_relevance']} low relevance)"
         )
-
     return passed
 
+
 # ============================================
-# LLM BATCH SCORING
+# BATCH LLM SCORING
 # ============================================
+
 def strip_html_basic(text):
     if not text: return ""
     clean = re.sub(r'<[^>]+>', ' ', text)
     clean = re.sub(r'&\w+;', ' ', clean)
     return re.sub(r'\s+', ' ', clean).strip()
+
 
 def build_batch_prompt(batch, profile, candidate_domain, candidate_years):
     name = str(profile.get("name", "Candidate"))[:100]
@@ -581,10 +469,7 @@ def build_batch_prompt(batch, profile, candidate_domain, candidate_years):
         company = job.get("company", "Unknown")
         summary = strip_html_basic(job.get("summary", ""))[:600]
         location = job.get("location", "") or job.get("_local", {}).get("location", "")
-        job_entries.append(
-            f"JOB_{idx}:\n  Title: {title}\n  Company: {company}\n  "
-            f"Location: {location}\n  Description: {summary}"
-        )
+        job_entries.append(f"JOB_{idx}:\n  Title: {title}\n  Company: {company}\n  Location: {location}\n  Description: {summary}")
 
     jobs_block = "\n\n".join(job_entries)
 
@@ -599,15 +484,17 @@ Skills: {skills_str}
 Functions: {role_str}
 
 JOBS:
+
 {jobs_block}
 
 SCORING RUBRIC — be VERY harsh on seniority mismatches:
+
 90-100: Perfect. Same function + domain. 4+ skills. SAME seniority level.
-80-89: Strong. Same function. 3+ skills. Seniority within 1-2 years.
-70-79: Good. Related function. 2-3 skills. Reasonable seniority.
-60-69: Weak. Adjacent function. 1-2 overlaps.
-40-59: Poor. Different function or major seniority gap.
-0-39: No fit.
+80-89:  Strong. Same function. 3+ skills. Seniority within 1-2 years.
+70-79:  Good. Related function. 2-3 skills. Reasonable seniority.
+60-69:  Weak. Adjacent function. 1-2 overlaps.
+40-59:  Poor. Different function or major seniority gap.
+0-39:   No fit.
 
 CRITICAL SENIORITY RULES (candidate has {candidate_years} years experience):
 - "Lead", "Head of", "Director", "VP", "Principal", "Staff" need 7+ years.
@@ -628,6 +515,7 @@ JOB_2: <score>
 
 Numbers only. No explanation."""
 
+
 def parse_batch_scores(response_text, batch_size):
     scores = [0] * batch_size
     for line in response_text.strip().split("\n"):
@@ -641,9 +529,9 @@ def parse_batch_scores(response_text, batch_size):
                 scores[idx] = score
     return scores
 
+
 def batch_score(batch, profile, candidate_domain, candidate_years, max_retries=3):
     prompt = build_batch_prompt(batch, profile, candidate_domain, candidate_years)
-
     for attempt in range(max_retries):
         try:
             res = client.chat.completions.create(
@@ -654,13 +542,10 @@ def batch_score(batch, profile, candidate_domain, candidate_years, max_retries=3
             )
             text = res.choices[0].message.content.strip()
             scores = parse_batch_scores(text, len(batch))
-
-            # Fallback: extract all numbers if parsing failed
             if sum(scores) == 0 and len(batch) > 1:
-                numbers = re.findall(r'(\d{1,3})', text)
+                numbers = re.findall(r'\b(\d{1,3})\b', text)
                 if len(numbers) >= len(batch):
                     scores = [max(0, min(100, int(n))) for n in numbers[:len(batch)]]
-
             return scores
         except Exception as e:
             if "rate" in str(e).lower() or "limit" in str(e).lower():
@@ -668,25 +553,21 @@ def batch_score(batch, profile, candidate_domain, candidate_years, max_retries=3
             elif attempt < max_retries - 1:
                 time.sleep(1)
             else:
-                logger.error(f"Batch scoring failed: {e}")
                 return [0] * len(batch)
-
     return [0] * len(batch)
+
 
 # ============================================
 # UTILITIES
 # ============================================
+
 def create_job_id(job):
     raw = "|".join([job.get("company", ""), job.get("title", ""), job.get("apply_url", "")[:100]])
     return hashlib.md5(raw.encode()).hexdigest()[:16]
 
 def profile_hash(profile):
-    relevant = {
-        "name": profile.get("name", ""),
-        "headline": profile.get("headline", ""),
-        "skills": sorted(profile.get("skills", [])),
-        "role_keywords": sorted(profile.get("role_keywords", []))
-    }
+    relevant = {"name": profile.get("name", ""), "headline": profile.get("headline", ""),
+                "skills": sorted(profile.get("skills", [])), "role_keywords": sorted(profile.get("role_keywords", []))}
     return hashlib.md5(json.dumps(relevant, sort_keys=True).encode()).hexdigest()
 
 def deduplicate_jobs(jobs):
@@ -704,7 +585,6 @@ def enforce_company_diversity(matches, max_per_company=MAX_PER_COMPANY):
     company_count = {}
     diverse = []
     overflow = []
-
     for m in matches:
         co = m.get("company", "Unknown").lower().strip()
         company_count[co] = company_count.get(co, 0) + 1
@@ -712,16 +592,16 @@ def enforce_company_diversity(matches, max_per_company=MAX_PER_COMPANY):
             diverse.append(m)
         else:
             overflow.append(m)
-
     remaining = MAX_MATCHES - len(diverse)
     if remaining > 0 and overflow:
         diverse.extend(overflow[:remaining])
-
     return diverse
 
+
 # ============================================
-# MAIN PIPELINE
+# PIPELINE
 # ============================================
+
 def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progress_callback=None):
     if not os.path.exists(profile_file):
         raise FileNotFoundError(f"Profile not found: {profile_file}")
@@ -730,15 +610,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         profile = json.load(f)
 
     candidate_years = estimate_experience_years(profile)
-    logger.info(f"Profile: {profile.get('name', '?')} | {len(profile.get('skills', []))} skills, {candidate_years}yr")
+    logger.info(f"Profile: {profile.get('name', '?')} — {len(profile.get('skills', []))} skills, ~{candidate_years}yr")
 
     candidate_domain = infer_candidate_domain(profile)
-    logger.info(f"✓ Domain identified: {candidate_domain}")
-
+    logger.info(f"Domain: {candidate_domain}")
     if progress_callback:
         progress_callback(f"Profile: ~{candidate_years} years exp | Domain: {candidate_domain}")
 
-    # Fetch jobs if needed
     if not os.path.exists(jobs_file):
         if progress_callback:
             progress_callback("Fetching jobs from all sources...")
@@ -747,22 +625,18 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
-
     if not jobs:
         return [], 0
 
     jobs = deduplicate_jobs(jobs)
     total_unique = len(jobs)
 
-    # Pre-filter
     candidates = prefilter_jobs(jobs, profile, candidate_years, progress_callback)
-
     if not candidates:
         if progress_callback:
-            progress_callback("⚠ No relevant jobs after filtering (India/Remote + seniority).")
+            progress_callback("No relevant jobs after filtering India/Remote + seniority.")
         return [], total_unique
 
-    # Semantic cache
     p_hash = profile_hash(profile)
     cache_file = os.path.join(session_dir, "semantic_cache.json")
     cache = {}
@@ -774,7 +648,6 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         except Exception:
             pass
 
-    # Split cached vs uncached
     uncached, cached_results = [], []
     for job in candidates:
         jid = create_job_id(job)
@@ -786,45 +659,39 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             uncached.append(job)
 
     logger.info(f"Cache: {len(cached_results)} hits, {len(uncached)} to score")
-
     if progress_callback:
         tb = (len(uncached) + BATCH_SIZE - 1) // BATCH_SIZE
         progress_callback(f"Scoring {len(uncached)} jobs in {tb} batches ({len(cached_results)} cached)")
 
-    # Batch score uncached
     api_calls = 0
     scored = []
     for i in range(0, len(uncached), BATCH_SIZE):
-        batch = uncached[i:i+BATCH_SIZE]
-        bn = (i // BATCH_SIZE) + 1
+        batch = uncached[i:i + BATCH_SIZE]
+        bn = i // BATCH_SIZE + 1
         tb = (len(uncached) + BATCH_SIZE - 1) // BATCH_SIZE
 
         if progress_callback:
-            titles = [f"{j.get('company', '?')[:15]} - {j.get('title', '?')[:35]}" for j in batch]
+            titles = [f"{j.get('company','?')[:15]}: {j.get('title','?')[:35]}" for j in batch]
             progress_callback(f"Batch {bn}/{tb}:")
             for t in titles:
-                progress_callback(f"  {t}")
+                progress_callback(f"  · {t}")
 
         scores = batch_score(batch, profile, candidate_domain, candidate_years)
         api_calls += 1
 
         for job, score in zip(batch, scores):
             ck = job.get("_cache_key", "")
-            if ck:
-                cache[ck] = score
+            if ck: cache[ck] = score
             scored.append((job, score))
-            logger.info(f"  {job.get('company', '?')[:20]} - {job.get('title', '?')[:40]}: {score}")
+            logger.info(f"  {job.get('company', '?')[:20]}: {job.get('title', '?')[:40]} → {score}")
 
         if progress_callback:
-            progress_callback(f"  Scores: {', '.join(str(s) for s in scores)}")
+            progress_callback(f"  → [{', '.join(str(s) for s in scores)}]")
 
         if i + BATCH_SIZE < len(uncached):
             time.sleep(API_RATE_LIMIT)
 
-    # Combine results
     all_results = cached_results + scored
-
-    # Filter by threshold
     matches = []
     for job, score in all_results:
         if score >= MATCH_THRESHOLD:
@@ -835,16 +702,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             matches.append(m)
 
     logger.info(f"Done: {len(matches)} matches from {len(candidates)} candidates ({api_calls} API calls)")
-
     if progress_callback:
-        progress_callback(f"✓ {len(matches)} matches ({api_calls} API calls, {len(cached_results)} cached)")
+        progress_callback(f"✅ {len(matches)} matches — {api_calls} API calls ({len(cached_results)} cached)")
 
-    # Sort and enforce diversity
     matches.sort(key=lambda x: x["match_score"], reverse=True)
     matches = enforce_company_diversity(matches)
     matches = matches[:MAX_MATCHES]
 
-    # Save cache
     os.makedirs(session_dir, exist_ok=True)
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
@@ -852,7 +716,6 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     except Exception as e:
         logger.error(f"Cache save: {e}")
 
-    # Generate cover letters
     if not letters_dir:
         letters_dir = os.path.join(session_dir, "cover_letters")
     os.makedirs(letters_dir, exist_ok=True)
@@ -864,29 +727,26 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         try:
             generate_cover_letter(j, profile, letters_dir)
         except Exception as e:
-            logger.error(f"Cover letter {j.get('title')}: {e}")
+            logger.error(f"Cover letter: {j.get('title')}: {e}")
 
     return matches, total_unique
 
+
 # ============================================
-# PUBLIC API
+# STREAMLIT WRAPPER
 # ============================================
-def run_auto_apply_pipeline(
-    profile_file=None, jobs_file=None, matches_file=None,
-    cache_file=None, log_file=None, letters_dir=None,
-    progress_callback=None
-):
+
+def run_auto_apply_pipeline(profile_file=None, jobs_file=None, matches_file=None,
+                            cache_file=None, log_file=None, letters_dir=None,
+                            progress_callback=None):
     try:
         if progress_callback:
             progress_callback("Starting pipeline...")
 
         session_dir = os.path.dirname(profile_file)
-
         matches, total = run_pipeline(
-            profile_file=profile_file,
-            jobs_file=jobs_file,
-            session_dir=session_dir,
-            letters_dir=letters_dir,
+            profile_file=profile_file, jobs_file=jobs_file,
+            session_dir=session_dir, letters_dir=letters_dir,
             progress_callback=progress_callback,
         )
 
@@ -896,30 +756,29 @@ def run_auto_apply_pipeline(
                 json.dump(matches, f, indent=2, ensure_ascii=False)
 
         if progress_callback:
-            progress_callback(f"✅ Done: {len(matches)} matches from {total} jobs.")
+            progress_callback(f"Done — {len(matches)} matches from {total} jobs.")
 
         if not matches:
             return {"status": "no_matches", "matches": 0, "total_scored": total}
-
         return {"status": "success", "matches": len(matches), "total_scored": total}
 
     except Exception as e:
         logger.exception("Pipeline error")
         if progress_callback:
-            progress_callback(f"❌ Error: {e}")
+            progress_callback(f"Error: {e}")
         return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 3:
         print("Usage: python run_auto_apply.py <profile.json> <jobs.json>")
         sys.exit(1)
-
     try:
         matches, total = run_pipeline(sys.argv[1], sys.argv[2], "data/test_session")
         print(f"\n✅ {len(matches)} matches from {total} jobs")
         for i, j in enumerate(matches, 1):
-            print(f"{i}. [{j['match_score']}] {j['company']} - {j['title']}")
+            print(f"  {i}. [{j['match_score']}%] {j['company']} — {j['title']}")
     except Exception as e:
         print(f"\n❌ {e}")
         sys.exit(1)
