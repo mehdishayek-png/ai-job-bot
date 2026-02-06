@@ -54,9 +54,9 @@ MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
 MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
-MAX_LLM_CANDIDATES = 30  # Only send this many to LLM
+MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
-MATCH_THRESHOLD = 55      # Local score threshold (out of 100) to even consider
+MATCH_THRESHOLD = 35      # Local score threshold — be generous, let LLM decide
 MAX_PER_COMPANY = 3       # Company diversity cap
 
 
@@ -119,10 +119,9 @@ def extract_profile_keywords(profile):
     skills = [s.lower().strip() for s in profile.get("skills", []) if s]
     headline = (profile.get("headline", "") or "").lower()
 
-    # Primary: specific, high-signal terms
+    # Primary: specific, high-signal terms (exact multi-word matches)
     primary = set()
     for s in skills:
-        # Multi-word skills are usually more specific
         primary.add(s)
 
     # Also extract key terms from headline
@@ -131,27 +130,98 @@ def extract_profile_keywords(profile):
         if len(term) > 2:
             primary.add(term.strip())
 
+    # ---- NEW: Expand keywords for broader matching ----
+    # Break multi-word skills into individual meaningful words
+    expanded = set()
+    stop_words = {
+        "and", "the", "for", "with", "from", "into", "our", "you", "your",
+        "tool", "tools", "using", "used", "based", "related", "across",
+        "including", "such", "various", "multiple", "key", "core", "new",
+        "high", "low", "top", "best", "good", "main", "major", "full",
+    }
+    for skill in skills:
+        words = skill.split()
+        for word in words:
+            word = word.strip(".,;:()/-")
+            if len(word) > 3 and word not in stop_words:
+                expanded.add(word)
+
+    # Add stem variants (common professional term expansions)
+    stem_map = {
+        "financial": ["finance", "financial"],
+        "finance": ["financial", "finance"],
+        "analysis": ["analyst", "analytics", "analytical"],
+        "analyst": ["analysis", "analytics", "analytical"],
+        "analytics": ["analyst", "analysis", "analytical"],
+        "operations": ["operational", "ops"],
+        "operational": ["operations", "ops"],
+        "management": ["manager", "managing"],
+        "manager": ["management", "managing"],
+        "consulting": ["consultant", "consultancy"],
+        "consultant": ["consulting", "consultancy"],
+        "marketing": ["market", "marketer"],
+        "engineering": ["engineer", "engineers"],
+        "engineer": ["engineering", "engineers"],
+        "development": ["developer", "developing"],
+        "developer": ["development", "developing"],
+        "accounting": ["accountant", "accounts"],
+        "accountant": ["accounting", "accounts"],
+        "strategy": ["strategic", "strategist"],
+        "strategic": ["strategy", "strategist"],
+        "automation": ["automated", "automate"],
+        "data": ["data"],
+        "product": ["product"],
+        "sales": ["sales"],
+        "support": ["support"],
+        "technical": ["tech", "technology"],
+        "technology": ["tech", "technical"],
+    }
+    for word in list(expanded):
+        if word in stem_map:
+            for variant in stem_map[word]:
+                expanded.add(variant)
+
+    # Add expanded terms to primary (they're lower signal but still useful)
+    # We keep them separate so the scoring can weight them differently
+    primary_expanded = primary | expanded
+
     # Secondary: broader terms that indicate general relevance
     secondary = set()
     domain_terms = [
+        # General professional
         "support", "operations", "management", "integration", "consulting",
         "technical", "implementation", "automation", "monitoring",
         "troubleshooting", "analyst", "coordinator", "specialist",
         "customer", "service", "incident", "process", "system",
+        # Supply chain / ops
         "order", "fulfillment", "warehouse", "supply chain", "logistics",
         "erp", "crm", "saas", "cloud", "api", "testing",
+        # Finance / business
+        "finance", "financial", "accounting", "audit", "budget",
+        "revenue", "reporting", "compliance", "risk", "advisory",
+        "due diligence", "valuation", "forecasting", "modeling",
+        "excel", "powerbi", "tableau", "sql", "python",
+        # Sales / marketing
+        "sales", "marketing", "growth", "strategy", "business development",
+        "pipeline", "lead generation", "market research",
+        # Data
+        "data", "analytics", "insights", "dashboard", "metrics",
+        "kpi", "visualization", "database",
+        # Product / project
+        "product", "project", "agile", "scrum", "roadmap",
+        "stakeholder", "cross-functional",
     ]
+    all_skill_text = " ".join(skills) + " " + headline
     for term in domain_terms:
-        if term in " ".join(skills) or term in headline:
+        if term in all_skill_text:
             secondary.add(term)
 
     # Title words for headline-to-title matching
     title_words = set(w for w in headline.split() if len(w) > 2)
-    # Remove noise words
     noise = {"and", "the", "for", "with", "from", "into", "our", "you", "your"}
     title_words -= noise
 
-    return primary, secondary, title_words
+    return primary_expanded, secondary, title_words
 
 
 # ============================================
@@ -449,6 +519,28 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         )
 
     if not scored_jobs:
+        # Fallback: if keyword matching is too strict, lower threshold and try again
+        logger.info("Zero keyword matches — retrying with threshold=20")
+        if progress_callback:
+            progress_callback("Keywords too specific — broadening search...")
+        for job in jobs:
+            title = job.get("title", "")
+            summary = job.get("summary", "")
+            if is_non_english(title, summary):
+                continue
+            if candidate_years < 3 and title_seniority(title) == "senior":
+                continue
+            local = score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_years)
+            if local["score"] >= 20:  # Very low bar — let LLM decide
+                job["_local_score"] = local["score"]
+                job["_local_detail"] = local
+                scored_jobs.append(job)
+        scored_jobs.sort(key=lambda j: j.get("_local_score", 0), reverse=True)
+        logger.info(f"Fallback: {len(scored_jobs)} jobs passed at threshold=20")
+        if progress_callback:
+            progress_callback(f"Broadened search: {len(scored_jobs)} candidates for LLM")
+
+    if not scored_jobs:
         if progress_callback:
             progress_callback("No relevant jobs found. Your profile may be too niche for these job boards.")
         return [], total_unique
@@ -501,9 +593,10 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         api_calls += 1
 
         for job, llm_score in zip(batch, scores):
-            # Combine local + LLM scores (60% local, 40% LLM)
+            # Combine local + LLM scores (40% local, 60% LLM)
+            # LLM gets more weight since local threshold is now generous
             local_score = job.get("_local_score", 0)
-            combined = int(local_score * 0.6 + llm_score * 0.4)
+            combined = int(local_score * 0.4 + llm_score * 0.6)
 
             ck = job.get("_cache_key", "")
             if ck:
@@ -526,17 +619,23 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     all_results.extend(scored_results)
 
     # ---- Phase 3: Filter, diversify, sort ----
-    FINAL_THRESHOLD = 60  # Combined score threshold
+    # Adaptive threshold: try 55, then 50, then 45 to ensure we always return something
+    for threshold in [55, 50, 45]:
+        matches = []
+        for job, score in all_results:
+            if score >= threshold:
+                m = job.copy()
+                m.pop("_local_score", None)
+                m.pop("_local_detail", None)
+                m.pop("_cache_key", None)
+                m["match_score"] = score
+                matches.append(m)
 
-    matches = []
-    for job, score in all_results:
-        if score >= FINAL_THRESHOLD:
-            m = job.copy()
-            m.pop("_local_score", None)
-            m.pop("_local_detail", None)
-            m.pop("_cache_key", None)
-            m["match_score"] = score
-            matches.append(m)
+        if matches:
+            logger.info(f"Threshold {threshold} yielded {len(matches)} matches")
+            break
+        else:
+            logger.info(f"Threshold {threshold} yielded 0 — trying lower")
 
     matches.sort(key=lambda x: x["match_score"], reverse=True)
     matches = enforce_company_diversity(matches)
