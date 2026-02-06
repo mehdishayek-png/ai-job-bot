@@ -503,6 +503,25 @@ code, .stCode, pre {
 
 load_dotenv()
 
+# ============================================
+# MODULE RELOAD — Critical for Streamlit hot-reload
+# Without this, Streamlit caches old module versions
+# and new code (like Lever/SerpAPI) never runs
+# ============================================
+import importlib
+import sys
+
+_modules_to_reload = [
+    "location_utils",
+    "job_fetcher",
+    "resume_parser",
+    "run_auto_apply",
+    "cover_letter_generator",
+]
+for _mod in _modules_to_reload:
+    if _mod in sys.modules:
+        importlib.reload(sys.modules[_mod])
+
 # Import functions from other modules
 try:
     from job_fetcher import fetch_all
