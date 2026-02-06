@@ -282,52 +282,26 @@ def is_hard_tech_role(title):
     return any(ht in title.lower() for ht in HARD_TECH_TITLES)
 
 def infer_candidate_domain(profile):
-    """Infer candidate's primary domain with HEADLINE-FIRST approach."""
     headline = (profile.get("headline", "") or "").lower()
     skills = [s.lower() for s in profile.get("skills", [])]
     role_kw = [s.lower() for s in profile.get("role_keywords", [])]
-    
-    # HEADLINE gets 3x weight - this is self-identification
-    headline_weight = 3
-    
+    all_text = headline + " " + " ".join(skills) + " " + " ".join(role_kw)
+
     domain_signals = {
-        "Customer Success / CX": [
-            "customer success", "customer experience", "cx", "cx specialist",
-            "customer support", "customer service", "customer care",
-            "client success", "support operations", "customer ops"
-        ],
-        "Operations": [
-            "operations", "operational", "project manage", "process",
-            "workflow", "ops manager"
-        ],
-        "Technical Support": [
-            "technical support", "tech support", "troubleshoot",
-            "helpdesk", "tier 1", "tier 2"
-        ],
-        "Product": ["product manage", "product ops", "product owner"],
-        "Sales": ["sales", "business development", "bdr", "sdr"],
-        "Marketing": ["marketing", "content", "seo"],
-        "Engineering": ["software engineer", "developer", "backend", "frontend"],
+        "Customer Success / CX": ["customer success", "customer experience", "cx", "nps", "csat", "churn", "retention", "onboarding", "customer support"],
+        "Operations": ["operations", "project manage", "process", "workflow", "sla", "escalation", "triage", "incident"],
+        "Technical Support": ["technical support", "tech support", "troubleshoot", "ticketing", "zendesk", "helpdesk"],
+        "Product": ["product manage", "product ops", "product owner", "roadmap", "beta testing"],
+        "Sales": ["sales", "business development", "bdr", "sdr", "revenue"],
+        "Marketing": ["marketing", "content", "seo", "social media", "brand"],
+        "Engineering": ["software engineer", "developer", "full stack", "backend", "frontend", "devops"],
     }
-    
-    domain_scores = {}
+
+    domains = []
     for domain, signals in domain_signals.items():
-        headline_hits = sum(1 for s in signals if s in headline) * headline_weight
-        combined_text = " ".join(skills + role_kw)
-        skill_hits = sum(1 for s in signals if s in combined_text)
-        total_score = headline_hits + skill_hits
-        if total_score > 0:
-            domain_scores[domain] = total_score
-    
-    if domain_scores:
-        sorted_domains = sorted(domain_scores.items(), key=lambda x: x[1], reverse=True)
-        logger.info(f"Domain scores: {sorted_domains[:3]}")
-        return sorted_domains[0][0]
-    
-    if any(kw in headline for kw in ["support", "success", "experience", "operations"]):
-        return "Customer Success / CX"
-    
-    return "General Professional"
+        if sum(1 for s in signals if s in all_text) >= 2:
+            domains.append(domain)
+    return " / ".join(domains[:2]) if domains else "General professional"
 
 
 # ============================================
