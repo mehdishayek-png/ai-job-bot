@@ -43,6 +43,20 @@ client = OpenAI(
 MODEL = os.getenv("COVER_LETTER_MODEL", "mistralai/mistral-7b-instruct")
 
 # ============================================
+# HTML STRIPPING
+# ============================================
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags and decode entities from text."""
+    if not text:
+        return ""
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    clean = clean.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    clean = clean.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
+
+# ============================================
 # FILENAME SANITIZATION
 # ============================================
 
@@ -106,7 +120,7 @@ def generate_cover_letter(job: dict, profile: dict, output_dir: str) -> str:
         # Validate inputs
         company = job.get("company", "Unknown Company")
         title = job.get("title", "Unknown Position")
-        summary = job.get("summary", "")[:2000]  # Truncate long descriptions
+        summary = strip_html(job.get("summary", ""))[:2000]  # Strip HTML + truncate
         
         name = profile.get("name", "Candidate")
         headline = profile.get("headline", "Professional")

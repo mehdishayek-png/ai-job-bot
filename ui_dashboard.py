@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import re
 import uuid
 import time
 from dotenv import load_dotenv
@@ -17,14 +18,13 @@ st.set_page_config(
 )
 
 # ============================================
-# CUSTOM CSS — polished, modern look
+# CUSTOM CSS
 # ============================================
 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ---- Global ---- */
 .stApp {
     font-family: 'DM Sans', sans-serif;
 }
@@ -32,11 +32,8 @@ h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
     font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
 }
-code, .stCode, pre {
-    font-family: 'JetBrains Mono', monospace !important;
-}
 
-/* ---- Hero banner ---- */
+/* Hero banner */
 .hero-banner {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0ea5e9 100%);
     padding: 2.5rem 2rem;
@@ -67,7 +64,7 @@ code, .stCode, pre {
     margin: 0;
 }
 
-/* ---- Welcome card ---- */
+/* Welcome card */
 .welcome-card {
     background: linear-gradient(135deg, #ecfdf5 0%, #f0f9ff 100%);
     border: 1px solid #a7f3d0;
@@ -86,7 +83,7 @@ code, .stCode, pre {
     font-size: 0.95rem;
 }
 
-/* ---- Section cards ---- */
+/* Section cards */
 .section-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
@@ -99,12 +96,9 @@ code, .stCode, pre {
     color: #0f172a !important;
     font-size: 1.1rem !important;
     margin-bottom: 0.8rem !important;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
-/* ---- Skill chips ---- */
+/* Skill chips */
 .skill-chips {
     display: flex;
     flex-wrap: wrap;
@@ -122,41 +116,48 @@ code, .stCode, pre {
     white-space: nowrap;
 }
 
-/* ---- Match card ---- */
-.match-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    margin-bottom: 0.6rem;
-    transition: box-shadow 0.2s;
-}
-.match-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-.match-score {
+/* Match score badges */
+.match-score-high {
     display: inline-block;
     background: #059669;
     color: white;
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.7rem;
     border-radius: 8px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 700;
 }
-.match-score.medium {
+.match-score-med {
+    display: inline-block;
     background: #d97706;
+    color: white;
+    padding: 0.25rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
 }
 
-/* ---- Status indicators ---- */
-.status-ready {
-    color: #059669;
+/* Cover letter box */
+.cl-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin-top: 0.8rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #334155;
+    white-space: pre-wrap;
+}
+.cl-label {
+    font-size: 0.78rem;
     font-weight: 600;
-}
-.status-pending {
-    color: #9ca3af;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.4rem;
 }
 
-/* ---- Pipeline step indicator ---- */
+/* Step indicator */
 .step-indicator {
     display: flex;
     justify-content: center;
@@ -189,7 +190,7 @@ code, .stCode, pre {
     border: 1px solid #e5e7eb;
 }
 
-/* ---- Misc ---- */
+/* Buttons */
 .stButton > button {
     border-radius: 10px !important;
     font-weight: 600 !important;
@@ -269,24 +270,71 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
+
+def strip_html(text):
+    """Remove HTML tags and decode entities for clean display."""
+    if not text:
+        return ""
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    clean = clean.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    clean = clean.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
+
+
+def sanitize_filename(s, max_length=50):
+    """Mirror the sanitize logic from cover_letter_generator."""
+    if not s:
+        return "unnamed"
+    s = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', s)
+    s = re.sub(r'\s+', '_', s)
+    s = re.sub(r'_+', '_', s)
+    s = s.strip('. ')
+    return s[:max_length] if s else "unnamed"
+
+
+def find_cover_letter(company, title, letters_dir):
+    """Find cover letter file matching a job, return (content, filename) or (None, None)."""
+    if not os.path.exists(letters_dir):
+        return None, None
+
+    # Exact match first (mirrors cover_letter_generator naming)
+    expected = f"{sanitize_filename(company)}__{sanitize_filename(title)}.txt"
+    path = os.path.join(letters_dir, expected)
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read(), expected
+        except Exception:
+            pass
+
+    # Fuzzy fallback: match on company + partial title
+    sc = sanitize_filename(company).lower()
+    st_partial = sanitize_filename(title).lower()[:20]
+    for fname in os.listdir(letters_dir):
+        if fname.endswith(".txt"):
+            fl = fname.lower()
+            if sc in fl and st_partial in fl:
+                try:
+                    with open(os.path.join(letters_dir, fname), "r", encoding="utf-8") as f:
+                        return f.read(), fname
+                except Exception:
+                    pass
+
+    return None, None
+
+
 # ============================================
 # LOAD PROFILE FROM DISK
 # ============================================
 
 _disk_profile = load_json(PROFILE_FILE)
-
-# More flexible profile validation
-if isinstance(_disk_profile, dict):
-    # Accept profile if it has at least a name OR skills
-    if _disk_profile.get("name") or _disk_profile.get("skills"):
-        profile = _disk_profile
-    else:
-        profile = {"name": "", "headline": "", "skills": []}
+if isinstance(_disk_profile, dict) and _disk_profile.get("skills"):
+    profile = _disk_profile
 else:
     profile = {"name": "", "headline": "", "skills": []}
 
-# Profile is valid if it has skills OR a name
-has_profile = bool(profile.get("skills") or (profile.get("name") and profile["name"] != "Candidate"))
+has_profile = bool(profile.get("skills"))
 has_matches = isinstance(load_json(MATCHES_FILE), list) and len(load_json(MATCHES_FILE)) > 0
 
 # ============================================
@@ -301,7 +349,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================
-# WELCOME / GREETING
+# WELCOME GREETING
 # ============================================
 
 if has_profile and profile.get("name") and profile["name"] != "Candidate":
@@ -347,7 +395,7 @@ with st.sidebar:
         "1. **Upload** your resume PDF\n"
         "2. **Review** extracted profile\n"
         "3. **Run matching** against live jobs\n"
-        "4. **Download** tailored cover letters"
+        "4. **Read & download** tailored cover letters"
     )
 
 # ============================================
@@ -357,7 +405,7 @@ with st.sidebar:
 col_left, col_right = st.columns([1, 1], gap="large")
 
 # ============================================
-# LEFT COLUMN: UPLOAD + PARSE
+# LEFT: UPLOAD + PARSE
 # ============================================
 
 with col_left:
@@ -386,30 +434,27 @@ with col_left:
 
         if not st.session_state.get("_profile_built"):
             if st.button("🧠 Parse Resume & Build Profile", use_container_width=True):
-                with st.spinner("Extracting skills, name, and headline..."):
+                with st.spinner("Extracting skills, name, and headline…"):
                     try:
                         build_profile(save_path, output_path=PROFILE_FILE)
 
                         if os.path.exists(PROFILE_FILE):
-                            with open(PROFILE_FILE, "r", encoding="utf-8") as f:
+                            with open(PROFILE_FILE, "r") as f:
                                 saved = json.load(f)
                             st.session_state["_profile_built"] = True
-
-                            # Pre-fill edit fields with parsed data
-                            st.session_state["name_input"] = saved.get("name", "")
-                            st.session_state["headline_input"] = saved.get("headline", "")
-                            st.session_state["skills_input"] = "\n".join(saved.get("skills", []))
-
-                            skill_count = len(saved.get("skills", []))
-                            name = saved.get("name", "Candidate")
-                            st.success(f"✅ Profile ready — {name}, {skill_count} skills found")
+                            for k in ("name_input", "headline_input", "skills_input"):
+                                st.session_state.pop(k, None)
+                            st.success(
+                                f"✅ {saved.get('name', 'Profile')} — "
+                                f"{len(saved.get('skills', []))} skills found"
+                            )
                             time.sleep(0.5)
                             st.rerun()
                         else:
-                            st.error("❌ Profile file was not created. Check your PDF.")
+                            st.error("❌ Profile file was not created.")
                     except Exception as e:
-                        st.error(f"❌ Parsing failed: {str(e)}")
-                        st.info("💡 Try entering your profile manually below, or use a different resume format.")
+                        st.error(f"❌ {e}")
+                        st.exception(e)
         else:
             st.info("✅ Resume parsed. Upload a new file to re-parse.")
     else:
@@ -418,14 +463,13 @@ with col_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# RIGHT COLUMN: PROFILE DISPLAY + EDIT
+# RIGHT: PROFILE DISPLAY + EDIT
 # ============================================
 
 with col_right:
     st.markdown('<div class="section-card"><h3>👤 Your Profile</h3>', unsafe_allow_html=True)
 
     if has_profile:
-        # Display extracted info nicely
         display_name = profile.get("name", "Candidate")
         display_headline = profile.get("headline", "")
 
@@ -434,34 +478,26 @@ with col_right:
         if display_headline:
             st.caption(display_headline)
 
-        # Skill chips
         skills = profile.get("skills", [])
         if skills:
-            chips_html = "".join(
-                f'<span class="skill-chip">{s}</span>' for s in skills
-            )
-            st.markdown(
-                f'<div class="skill-chips">{chips_html}</div>',
-                unsafe_allow_html=True,
-            )
+            chips_html = "".join(f'<span class="skill-chip">{s}</span>' for s in skills)
+            st.markdown(f'<div class="skill-chips">{chips_html}</div>', unsafe_allow_html=True)
             st.caption(f"{len(skills)} skills · parsed from resume")
         else:
-            st.info("No skills extracted yet. Add them manually below to enable job matching.")
+            st.info("No skills extracted. Add them manually below.")
     else:
         st.markdown(
-            '<p class="status-pending">No profile yet — upload a resume or fill in manually below.</p>',
+            '<p style="color:#9ca3af;">No profile yet — upload a resume or fill in manually below.</p>',
             unsafe_allow_html=True,
         )
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---- Editable fields (collapsed if profile exists) ----
-    with st.expander("✏️ Edit profile manually" if has_profile else "✏️ Create profile manually", expanded=not has_profile):
-        name_val = st.text_input(
-            "Full Name",
-            key="name_input",
-            placeholder="Your full name"
-        )
+    with st.expander(
+        "✏️ Edit profile manually" if has_profile else "✏️ Create profile manually",
+        expanded=not has_profile,
+    ):
+        name_val = st.text_input("Full Name", key="name_input", placeholder="Your full name")
         headline_input = st.text_input(
             "Professional Headline",
             key="headline_input",
@@ -471,13 +507,11 @@ with col_right:
             "Skills / Keywords (one per line)",
             height=150,
             key="skills_input",
-            placeholder="salesforce\nzendesk\ncustomer success\nsaas\n..."
+            placeholder="salesforce\nzendesk\ncustomer success\nsaas\n...",
         )
 
         if st.button("💾 Save Profile", use_container_width=True):
-            # Parse skills
             skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
-            
             if not skills_list and not name_val:
                 st.error("❌ Please enter at least a name or some skills")
             else:
@@ -488,8 +522,6 @@ with col_right:
                 }
                 save_json(PROFILE_FILE, updated)
                 st.success("✅ Saved!")
-                
-                # Clear input cache
                 for k in ("name_input", "headline_input", "skills_input"):
                     st.session_state.pop(k, None)
                 st.session_state.pop("_matching_done", None)
@@ -503,14 +535,11 @@ with col_right:
 st.markdown("---")
 st.markdown('<div class="section-card"><h3>🚀 Job Matching</h3>', unsafe_allow_html=True)
 
-# Better validation for job matching
 profile_ready = bool(profile.get("skills") and len(profile.get("skills", [])) > 0)
 
 if not profile_ready:
     st.info("⚠️ Add at least one skill to your profile above to unlock job matching.")
-    st.caption("Job matching uses your skills to find relevant positions. You can add them by parsing your resume or entering them manually.")
 else:
-    # Optional jobs upload
     with st.expander("📁 Upload custom jobs.json (optional)"):
         jobs_upload = st.file_uploader(
             "Upload jobs.json",
@@ -534,10 +563,9 @@ else:
         if st.button("🔄 Re-run with fresh jobs"):
             st.session_state.pop("_matching_done", None)
             st.session_state.pop("_matching_running", None)
-            for f in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
-                if os.path.exists(f):
-                    os.remove(f)
-            # Clear cover letters too
+            for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                if os.path.exists(fp):
+                    os.remove(fp)
             if os.path.exists(LETTERS_DIR):
                 for lf in os.listdir(LETTERS_DIR):
                     os.remove(os.path.join(LETTERS_DIR, lf))
@@ -562,7 +590,7 @@ else:
                 log_lines.append(msg)
                 log_container.code("\n".join(log_lines[-20:]), language=None)
 
-            status_box.info("🔍 Fetching jobs and scoring matches... this takes 2-5 min.")
+            status_box.info("🔍 Fetching jobs and scoring matches... this takes 2–5 min.")
 
             try:
                 result = run_auto_apply_pipeline(
@@ -598,7 +626,7 @@ else:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# MATCH RESULTS
+# MATCH RESULTS — with embedded cover letters
 # ============================================
 
 matches_data = load_json(MATCHES_FILE)
@@ -606,61 +634,63 @@ matches_data = load_json(MATCHES_FILE)
 if isinstance(matches_data, list) and matches_data:
     st.markdown("---")
     st.markdown(f"### 📊 Top {len(matches_data)} Matches")
+    st.caption("Each match includes the job details, your compatibility score, and a tailored cover letter.")
 
     for i, job in enumerate(matches_data, 1):
         score = job.get("match_score", 0)
-        score_class = "" if score >= 85 else " medium"
+        score_class = "match-score-high" if score >= 85 else "match-score-med"
         company = job.get("company", "Unknown")
         title = job.get("title", "Unknown")
         source = job.get("source", "")
 
-        with st.expander(f"**#{i}** · {company} — {title}"):
-            c1, c2 = st.columns([3, 1])
-            with c1:
+        # Clean summary — strip all HTML
+        raw_summary = job.get("summary", "")
+        clean_summary = strip_html(raw_summary)
+        if len(clean_summary) > 350:
+            clean_summary = clean_summary[:350] + "…"
+
+        with st.expander(f"#{i}  ·  {company} — {title}  ({score}%)"):
+            # ---- Top row: job info + score badge ----
+            c_info, c_score = st.columns([4, 1])
+
+            with c_info:
                 st.markdown(f"**{title}**")
-                st.caption(f"{company} · via {source}")
-                if job.get("summary"):
-                    st.write(job["summary"][:400] + ("..." if len(job.get("summary", "")) > 400 else ""))
-            with c2:
+                st.caption(f"🏢 {company}  ·  via {source}")
+                if clean_summary:
+                    st.write(clean_summary)
+
+            with c_score:
                 st.markdown(
-                    f'<div style="text-align:center;margin-top:0.5rem;">'
-                    f'<span class="match-score{score_class}">{score}% match</span>'
+                    f'<div style="text-align:center; margin-top:0.3rem;">'
+                    f'<span class="{score_class}">{score}%</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
                 if job.get("apply_url"):
                     st.link_button("🔗 Apply", job["apply_url"], use_container_width=True)
 
-# ============================================
-# COVER LETTERS
-# ============================================
+            # ---- Cover letter embedded below ----
+            cl_content, cl_filename = find_cover_letter(company, title, LETTERS_DIR)
 
-if os.path.exists(LETTERS_DIR):
-    files = sorted(f for f in os.listdir(LETTERS_DIR) if f.endswith(".txt"))
-
-    if files:
-        st.markdown("---")
-        st.markdown(f"### 📝 Cover Letters ({len(files)})")
-
-        selected = st.selectbox(
-            "Select a cover letter",
-            files,
-            format_func=lambda x: x.replace("__", " · ").replace("_", " ").replace(".txt", ""),
-        )
-        if selected:
-            try:
-                content = open(
-                    os.path.join(LETTERS_DIR, selected), "r", encoding="utf-8"
-                ).read()
-                st.text_area("Preview", content, height=250, label_visibility="collapsed")
-                st.download_button(
-                    "📥 Download",
-                    data=content,
-                    file_name=selected,
-                    mime="text/plain",
+            if cl_content:
+                st.markdown("---")
+                st.markdown(
+                    '<p class="cl-label">📝 Tailored Cover Letter</p>',
+                    unsafe_allow_html=True,
                 )
-            except Exception as e:
-                st.error(f"Failed to load: {e}")
+                st.markdown(
+                    f'<div class="cl-box">{cl_content}</div>',
+                    unsafe_allow_html=True,
+                )
+                # Download button for this cover letter
+                st.download_button(
+                    "📥 Download Cover Letter",
+                    data=cl_content,
+                    file_name=cl_filename or f"cover_letter_{i}.txt",
+                    mime="text/plain",
+                    key=f"dl_cl_{i}",
+                    use_container_width=True,
+                )
 
 # ============================================
 # FOOTER

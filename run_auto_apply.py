@@ -207,6 +207,7 @@ def run_pipeline(
     profile_file: str,
     jobs_file: str,
     session_dir: str,
+    letters_dir: str = None,
     progress_callback=None
 ) -> list:
     """
@@ -332,7 +333,8 @@ def run_pipeline(
         logger.error(f"Failed to save cache: {e}")
 
     # ---- Generate cover letters ----
-    letters_dir = os.path.join(session_dir, "cover_letters")
+    if not letters_dir:
+        letters_dir = os.path.join(session_dir, "cover_letters")
     os.makedirs(letters_dir, exist_ok=True)
 
     if progress_callback:
@@ -374,6 +376,7 @@ def run_auto_apply_pipeline(
             profile_file=profile_file,
             jobs_file=jobs_file,
             session_dir=session_dir,
+            letters_dir=letters_dir,
             progress_callback=progress_callback,
         )
 

@@ -24,6 +24,36 @@ NETWORK_TIMEOUT = 30  # seconds
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags and decode entities from text."""
+    import re
+    if not text:
+        return ""
+    # Remove HTML tags
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    # Decode common HTML entities
+    clean = clean.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+    clean = clean.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+    # Collapse whitespace
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
+
+
+def extract_company_from_title(title: str) -> tuple:
+    """
+    Many RSS feeds encode company in the title as 'Company: Job Title'.
+    Returns (company, clean_title).
+    """
+    if not title:
+        return ("Unknown", title)
+    # WeWorkRemotely uses "Company: Title" format
+    if ": " in title:
+        parts = title.split(": ", 1)
+        if len(parts) == 2 and len(parts[0]) < 60:
+            return (parts[0].strip(), parts[1].strip())
+    return ("", title)
+
 WWR_FEEDS = [
     "https://weworkremotely.com/categories/remote-programming-jobs.rss",
     "https://weworkremotely.com/categories/remote-design-jobs.rss",
@@ -79,10 +109,23 @@ def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries
             # Extract jobs
             for entry in feed.entries:
                 try:
+                    raw_title = entry.get("title", "").strip()
+                    author = entry.get("author", "").strip()
+                    raw_summary = entry.get("summary", "").strip()
+                    
+                    # Extract company: prefer author, fall back to title parsing
+                    if author and author != "Unknown":
+                        company = author
+                        title = raw_title
+                    else:
+                        parsed_company, parsed_title = extract_company_from_title(raw_title)
+                        company = parsed_company if parsed_company else "Unknown"
+                        title = parsed_title
+                    
                     job = {
-                        "title": entry.get("title", "").strip(),
-                        "company": entry.get("author", "Unknown").strip(),
-                        "summary": entry.get("summary", "").strip(),
+                        "title": title,
+                        "company": company,
+                        "summary": strip_html(raw_summary),
                         "apply_url": entry.get("link", "").strip(),
                         "source": source,
                     }
@@ -175,7 +218,7 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
                 job = {
                     "title": j.get("title", "Unknown").strip(),
                     "company": j.get("company_name", "Unknown").strip(),
-                    "summary": (j.get("description", "")[:500]).strip(),  # Truncate description
+                    "summary": strip_html((j.get("description", "")[:500]).strip()),
                     "apply_url": j.get("url", "").strip(),
                     "source": "Remotive",
                 }
