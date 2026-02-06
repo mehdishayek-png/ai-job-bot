@@ -730,7 +730,17 @@ with col2:
                         f.write(uploaded_resume.getbuffer())
                     
                     # Parse resume
+                    # Preserve country from existing profile
+                    existing = load_json(PROFILE_FILE)
+                    existing_country = existing.get("country", "India") if existing else "India"
+                    
                     profile = build_profile(resume_path, PROFILE_FILE)
+                    
+                    # Re-add country to the saved profile
+                    if "country" not in profile:
+                        profile["country"] = existing_country
+                        save_json(PROFILE_FILE, profile)
+                    
                     st.success("✅ Resume parsed successfully!")
                     time.sleep(0.5)
                     st.rerun()
@@ -754,6 +764,9 @@ if profile and profile.get("skills"):
         st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
 
     # Display location preferences
+    country = profile.get("country", "")
+    if country:
+        st.caption(f"📍 Location: {country}")
     if profile.get("location_preferences"):
         prefs = profile["location_preferences"]
         pref_names = []
@@ -774,6 +787,22 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
         height=150,
         help="Enter specific skills, tools, and technologies - these are used for matching"
     )
+
+    # Location selector
+    COUNTRY_OPTIONS = [
+        "India", "United States", "United Kingdom", "Canada", "Germany",
+        "Australia", "UAE", "Saudi Arabia", "Singapore", "Netherlands",
+        "France", "Ireland", "Israel", "Brazil", "Remote Only",
+    ]
+    current_country = profile.get("country", "India") if profile else "India"
+    if current_country not in COUNTRY_OPTIONS:
+        COUNTRY_OPTIONS.append(current_country)
+    country_input = st.selectbox(
+        "📍 Your Location",
+        options=COUNTRY_OPTIONS,
+        index=COUNTRY_OPTIONS.index(current_country) if current_country in COUNTRY_OPTIONS else 0,
+        help="We'll prioritize jobs in your country and use it for smarter search queries"
+    )
     
     if st.button("💾 Save Profile", use_container_width=True):
         skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
@@ -784,6 +813,7 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
                 "name": name_input or "Candidate",
                 "headline": headline_input,
                 "skills": skills_list,
+                "country": country_input,
             }
             save_json(PROFILE_FILE, updated_profile)
             st.success("✅ Profile saved!")
@@ -871,11 +901,13 @@ else:
         st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
     
     else:
-        st.markdown("""
+        country = profile.get("country", "India")
+        st.markdown(f"""
         **Ready to find your next role?**
         
-        We'll scan **WeWorkRemotely**, **RemoteOK**, **Jobicy**, and **Remotive** 
-        for jobs matching your skills, then rank the top candidates using AI.
+        We'll scan **6 sources** — WeWorkRemotely, RemoteOK, Remotive, Lever, 
+        and **Google Jobs** (LinkedIn, Indeed, Naukri) focused on **{country}** — 
+        then rank the best matches using AI.
         """)
         
         if st.button("🚀 Start Job Matching", type="primary", use_container_width=True):

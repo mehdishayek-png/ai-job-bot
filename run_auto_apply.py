@@ -434,6 +434,27 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     if progress_callback:
         progress_callback(f"Profile loaded: ~{candidate_years} years experience")
 
+    # ---- User's country for location-aware scoring ----
+    user_country = (profile.get("country", "") or "").strip()
+    user_country_lc = user_country.lower()
+    # Aliases: common alternate names for countries in job postings
+    COUNTRY_ALIASES = {
+        "india": ["india", "bangalore", "bengaluru", "mumbai", "delhi", "hyderabad", "pune", "chennai", "noida", "gurgaon", "gurugram", "kolkata"],
+        "united states": ["united states", "usa", "us-based", "u.s."],
+        "united kingdom": ["united kingdom", "uk", "london", "england"],
+        "canada": ["canada", "toronto", "vancouver"],
+        "germany": ["germany", "berlin", "munich", "deutschland"],
+        "australia": ["australia", "sydney", "melbourne"],
+        "uae": ["uae", "dubai", "abu dhabi", "united arab emirates"],
+        "saudi arabia": ["saudi arabia", "saudi", "riyadh", "jeddah", "ksa"],
+        "singapore": ["singapore"],
+        "netherlands": ["netherlands", "amsterdam", "dutch"],
+        "france": ["france", "paris"],
+        "ireland": ["ireland", "dublin"],
+    }
+    country_aliases = COUNTRY_ALIASES.get(user_country_lc, [user_country_lc] if user_country_lc else [])
+    logger.info(f"User country: {user_country} (aliases: {country_aliases[:3]}...)")
+
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
         if progress_callback:
@@ -599,6 +620,12 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             # LLM gets more weight since local threshold is now generous
             local_score = job.get("_local_score", 0)
             combined = int(local_score * 0.4 + llm_score * 0.6)
+
+            # Location boost: +8 if job mentions user's country
+            if user_country_lc and user_country_lc != "remote only":
+                job_text = f"{job.get('title','')} {job.get('summary','')} {job.get('source','')}".lower()
+                if user_country_lc in job_text or any(alias in job_text for alias in country_aliases):
+                    combined = min(combined + 8, 100)
 
             ck = job.get("_cache_key", "")
             if ck:

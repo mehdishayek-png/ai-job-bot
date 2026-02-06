@@ -313,36 +313,55 @@ def fetch_lever_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
 def build_serpapi_queries(profile: dict) -> list:
     """
     Generate targeted SerpAPI queries from user profile.
-    Focus: India + remote jobs matching the candidate's skills.
+    Uses profile['country'] for location-focused searches.
     Returns max SERPAPI_MAX_QUERIES queries.
     """
     headline = (profile.get("headline", "") or "").strip()
     skills = profile.get("skills", [])
+    country = (profile.get("country", "") or "India").strip()
+
+    # For "Remote Only", don't add country to searches
+    is_remote_only = country.lower() in ("remote only", "remote", "global", "")
+    loc_tag = "" if is_remote_only else country
+    serpapi_location = None if is_remote_only else country
+
     queries = []
 
     # Query 1-2: Headline-based (most targeted)
     if headline:
-        queries.append({"q": f"{headline} remote jobs India", "location": "India"})
-        queries.append({"q": f"{headline} jobs remote"})
+        if loc_tag:
+            queries.append({"q": f"{headline} jobs {loc_tag}", "location": serpapi_location})
+        queries.append({"q": f"{headline} remote jobs"})
 
     # Query 3-4: Multi-word skills (most specific)
     multi_word = [s for s in skills if " " in s and len(s) > 5][:2]
     for skill in multi_word:
-        queries.append({"q": f"{skill} remote jobs India", "location": "India"})
+        q = {"q": f"{skill} jobs"}
+        if loc_tag:
+            q["q"] = f"{skill} jobs {loc_tag}"
+            q["location"] = serpapi_location
+        queries.append(q)
 
     # Query 5-6: Single-word skills with role context
     single_word = [s for s in skills if " " not in s and len(s) > 3][:2]
     for skill in single_word:
-        queries.append({"q": f"{skill} analyst remote India", "location": "India"})
+        q = {"q": f"{skill} remote jobs"}
+        if loc_tag:
+            q["q"] = f"{skill} jobs {loc_tag}"
+            q["location"] = serpapi_location
+        queries.append(q)
 
     # If we still have room and headline exists, add a broader search
     if len(queries) < SERPAPI_MAX_QUERIES and headline:
-        # Extract the main role word
         role_words = ["consultant", "analyst", "engineer", "developer", "specialist",
                       "manager", "coordinator", "support", "associate", "executive"]
         for word in role_words:
             if word in headline.lower():
-                queries.append({"q": f"remote {word} India hiring", "location": "India"})
+                q = {"q": f"remote {word} hiring"}
+                if loc_tag:
+                    q["q"] = f"{word} jobs {loc_tag} hiring"
+                    q["location"] = serpapi_location
+                queries.append(q)
                 break
 
     return queries[:SERPAPI_MAX_QUERIES]
