@@ -418,37 +418,6 @@ def enforce_company_diversity(matches):
     return diverse
 
 
-def _build_serpapi_queries(profile):
-    """
-    Generate SerpAPI search queries based on user profile.
-    Uses headline + top skills to create targeted job searches.
-    Max 6 queries (to stay under free tier limits).
-    """
-    headline = (profile.get("headline", "") or "").strip()
-    skills = profile.get("skills", [])
-
-    queries = []
-
-    # Query 1: Headline-based search
-    if headline:
-        queries.append({"q": f"remote {headline}", "location": "India"})
-        queries.append({"q": f"{headline} remote jobs"})
-
-    # Query 2-4: Top skill-based searches
-    # Pick the most specific multi-word skills
-    multi_word = [s for s in skills if " " in s and len(s) > 5][:3]
-    for skill in multi_word:
-        queries.append({"q": f"remote {skill} jobs", "location": "India"})
-
-    # Query 5-6: Domain-based searches
-    single_word = [s for s in skills if " " not in s and len(s) > 3][:2]
-    for skill in single_word:
-        queries.append({"q": f"{skill} remote analyst India"})
-
-    # Cap at 6 queries
-    return queries[:6]
-
-
 # ============================================
 # PIPELINE
 # ============================================
@@ -468,11 +437,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
         if progress_callback:
-            progress_callback("Fetching jobs from all sources...")
-        from job_fetcher import fetch_all
+            progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
+        from job_fetcher import fetch_all, build_serpapi_queries
 
-        # Generate profile-based SerpAPI queries
-        serpapi_queries = _build_serpapi_queries(profile)
+        # Generate profile-based SerpAPI queries for India-focused search
+        serpapi_queries = build_serpapi_queries(profile)
+        logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
+
         fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
