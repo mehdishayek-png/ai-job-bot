@@ -1,5 +1,22 @@
+"""
+JobBot Matching Engine v6 — Keyword-First Approach
+====================================================
+Previous versions relied on Mistral 7B to score every job individually.
+Result: 162 API calls, 2 garbage matches (Java Developer for an Oracle OMS consultant).
+
+New approach:
+1. Extract strong keywords from profile (skills + headline + role terms)
+2. Score ALL jobs locally by keyword overlap — zero API calls
+3. Only send top 30 to LLM as a SINGLE batch for final ranking
+4. Enforce seniority gate + company diversity
+
+Cost: 1-3 API calls total (was 162)
+Quality: keyword matching is deterministic and accurate for this use case
+"""
+
 import json
 import os
+import re
 import hashlib
 import time
 import logging
@@ -7,585 +24,590 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from cover_letter_generator import generate_cover_letter
 
-# ============================================
-# LOGGING SETUP
-# ============================================
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # ============================================
-# LOAD API KEY
+# API CLIENT
 # ============================================
 
 load_dotenv()
-
 api_key = os.getenv("OPENROUTER_API_KEY")
 if not api_key:
-    # Try Streamlit secrets
     try:
         import streamlit as st
         api_key = st.secrets.get("OPENROUTER_API_KEY")
     except (ImportError, KeyError, AttributeError):
         pass
-
 if not api_key:
-    raise ValueError(
-        "OPENROUTER_API_KEY not found. "
-        "Set it in .env file or Streamlit secrets."
-    )
+    raise ValueError("OPENROUTER_API_KEY not found.")
 
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
-)
-
-# ============================================
-# CONFIGURATION
-# ============================================
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 # ============================================
 # CONFIG
 # ============================================
-MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-thinking-exp:free")
-MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))  # Accept 70+ scores
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "30"))  # Show top 30 results
-API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.3"))  # Faster requests
-MAX_LLM_CANDIDATES = int(os.getenv("MAX_LLM_CANDIDATES", "50"))  # Score top 50 jobs
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "5"))  # ✅ Keep at 5
-MAX_PER_COMPANY = 3  # ✅ Keep at 3
-  # seconds between calls
-# ============================================
-# UTILITIES
-# ============================================
 
-def create_job_id(job: dict) -> str:
-    """
-    Create unique job ID using multiple fields to avoid collisions.
-    """
-    unique_str = "|".join([
-        job.get("company", "unknown"),
-        job.get("title", "unknown"),
-        job.get("apply_url", "")[:100],  # Use part of URL for uniqueness
-    ])
-    return hashlib.md5(unique_str.encode()).hexdigest()[:16]
+MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-exp:free")
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
+API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
+MAX_LLM_CANDIDATES = 30  # Only send this many to LLM
+LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
+MATCH_THRESHOLD = 55      # Local score threshold (out of 100) to even consider
+MAX_PER_COMPANY = 3       # Company diversity cap
 
-
-def profile_hash(profile: dict) -> str:
-    """
-    Create a unique hash per profile for cache isolation.
-    """
-    # Only hash the relevant fields
-    relevant = {
-        "name": profile.get("name", ""),
-        "headline": profile.get("headline", ""),
-        "skills": sorted(profile.get("skills", []))  # Sort for consistency
-    }
-    text = json.dumps(relevant, sort_keys=True)
-    return hashlib.md5(text.encode()).hexdigest()
-
-
-def build_safe_profile_text(profile: dict) -> str:
-    """
-    Build profile text with input validation and sanitization.
-    """
-    # Validate and sanitize name
-    name = str(profile.get("name", "Candidate"))[:100].strip()
-    
-    # Validate and sanitize headline
-    headline = str(profile.get("headline", "Professional"))[:200].strip()
-    
-    # Validate skills is a list
-    skills = profile.get("skills", [])
-    if not isinstance(skills, list):
-        logger.warning("Skills is not a list, converting to empty list")
-        skills = []
-    
-    # Sanitize skills - limit length and count
-    safe_skills = [str(s)[:50].strip() for s in skills if s][:50]
-    
-    if not safe_skills:
-        logger.warning("No valid skills found in profile")
-    
-    return f"""
-Name: {name}
-Headline: {headline}
-
-Skills:
-{", ".join(safe_skills) if safe_skills else "None specified"}
-"""
-
-
-def deduplicate_jobs(jobs: list) -> list:
-    """
-    Remove duplicate jobs based on company + title.
-    """
-    seen = set()
-    unique = []
-    
-    for job in jobs:
-        key = (
-            job.get("company", "").lower().strip(),
-            job.get("title", "").lower().strip()
-        )
-        
-        if key not in seen and key != ("", ""):
-            seen.add(key)
-            unique.append(job)
-        else:
-            logger.debug(f"Skipping duplicate job: {key}")
-    
-    logger.info(f"Deduplicated {len(jobs)} jobs to {len(unique)} unique jobs")
-    return unique
 
 # ============================================
-# SENIORITY DETECTION
+# SENIORITY
 # ============================================
 
-SENIOR_TITLE_WORDS = [
+SENIOR_MARKERS = [
     "lead", "head of", "head,", "director", "vp ", "vice president",
     "principal", "chief", "cto", "coo", "ceo", "cfo",
     "founding", "co-founder", "partner", "svp", "evp",
-    "staff ", "distinguished",
+    "staff engineer", "staff developer", "distinguished",
 ]
 
-MID_TITLE_WORDS = [
-    "senior", "sr ", "sr.", "manager", "team lead",
-]
+MID_MARKERS = ["senior", "sr ", "sr.", "manager", "team lead"]
 
 
-def detect_seniority(title: str) -> str:
-    """Classify job title seniority: 'senior', 'mid', or 'open'."""
+def title_seniority(title):
     t = title.lower()
-    if any(w in t for w in SENIOR_TITLE_WORDS):
+    if any(m in t for m in SENIOR_MARKERS):
         return "senior"
-    if any(w in t for w in MID_TITLE_WORDS):
+    if any(m in t for m in MID_MARKERS):
         return "mid"
     return "open"
 
 
-def estimate_candidate_years(profile: dict) -> int:
-    """Estimate experience from profile headline/skills."""
+def estimate_years(profile):
     headline = (profile.get("headline", "") or "").lower()
-
-    # Look for explicit mention
-    import re as _re
-    m = _re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
+    m = re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
     if m:
         return int(m.group(1))
-
-    # Infer from title words
-    if any(w in headline for w in ["intern", "trainee", "fresher", "entry"]):
+    if any(w in headline for w in ["intern", "trainee", "fresher"]):
         return 0
     if any(w in headline for w in ["junior", "associate", "jr "]):
         return 1
-    if any(w in headline for w in ["specialist", "analyst", "coordinator", "executive"]):
+    if any(w in headline for w in ["specialist", "analyst", "coordinator"]):
+        return 2
+    if any(w in headline for w in ["consultant"]):
         return 2
     if any(w in headline for w in ["senior", "sr ", "lead", "manager"]):
         return 5
     if any(w in headline for w in ["director", "head of", "vp "]):
         return 10
-
-    return 2  # Conservative default
+    return 2
 
 
 # ============================================
-# LOCATION CLASSIFICATION
+# KEYWORD EXTRACTION FROM PROFILE
 # ============================================
 
-INDIA_SIGNALS = [
-    "india", "bangalore", "bengaluru", "mumbai", "delhi",
-    "hyderabad", "pune", "chennai", "kolkata", "gurgaon",
-    "gurugram", "noida", "jaipur", "ahmedabad", "kochi",
-    "chandigarh", "indore", "lucknow", "coimbatore",
+def extract_profile_keywords(profile):
+    """
+    Build a rich keyword set from the profile for local matching.
+    Returns (primary_keywords, secondary_keywords, title_words).
+
+    Primary = specific tools/platforms/domains (high signal)
+    Secondary = general professional terms (lower signal)
+    Title = words from headline for title matching
+    """
+    skills = [s.lower().strip() for s in profile.get("skills", []) if s]
+    headline = (profile.get("headline", "") or "").lower()
+
+    # Primary: specific, high-signal terms
+    primary = set()
+    for s in skills:
+        # Multi-word skills are usually more specific
+        primary.add(s)
+
+    # Also extract key terms from headline
+    headline_terms = re.findall(r'[a-z][a-z0-9/\-\.]+(?:\s+[a-z][a-z0-9/\-\.]+)?', headline)
+    for term in headline_terms:
+        if len(term) > 2:
+            primary.add(term.strip())
+
+    # Secondary: broader terms that indicate general relevance
+    secondary = set()
+    domain_terms = [
+        "support", "operations", "management", "integration", "consulting",
+        "technical", "implementation", "automation", "monitoring",
+        "troubleshooting", "analyst", "coordinator", "specialist",
+        "customer", "service", "incident", "process", "system",
+        "order", "fulfillment", "warehouse", "supply chain", "logistics",
+        "erp", "crm", "saas", "cloud", "api", "testing",
+    ]
+    for term in domain_terms:
+        if term in " ".join(skills) or term in headline:
+            secondary.add(term)
+
+    # Title words for headline-to-title matching
+    title_words = set(w for w in headline.split() if len(w) > 2)
+    # Remove noise words
+    noise = {"and", "the", "for", "with", "from", "into", "our", "you", "your"}
+    title_words -= noise
+
+    return primary, secondary, title_words
+
+
+# ============================================
+# LOCAL KEYWORD SCORING (NO LLM)
+# ============================================
+
+def score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_years):
+    """
+    Score a job purely by keyword overlap. Returns 0-100.
+
+    Scoring breakdown:
+    - Primary keyword hits: up to 50 points
+    - Secondary keyword hits: up to 20 points
+    - Title-headline overlap: up to 20 points
+    - Seniority match: up to 10 points (or penalty)
+    """
+    title = (job.get("title", "") or "").lower()
+    summary = (job.get("summary", "") or "").lower()
+    job_text = f"{title} {summary}"
+
+    # ---- Primary keyword hits (0-50) ----
+    primary_hits = 0
+    matched_primary = []
+    for kw in primary_kw:
+        if kw in job_text:
+            primary_hits += 1
+            matched_primary.append(kw)
+
+    if not primary_kw:
+        primary_score = 0
+    else:
+        # 1 hit=15, 2=28, 3=38, 4=45, 5+=50
+        primary_score = min(50, primary_hits * 15 - max(0, (primary_hits - 1) * 5))
+        primary_score = max(0, primary_score)
+
+    # ---- Secondary keyword hits (0-25) ----
+    secondary_hits = sum(1 for kw in secondary_kw if kw in job_text)
+    secondary_score = min(25, secondary_hits * 6)
+
+    # ---- Title-headline overlap (0-20) ----
+    title_tokens = set(w for w in title.split() if len(w) > 2)
+    title_tokens -= {"and", "the", "for", "with", "remote", "hybrid", "onsite"}
+    overlap = len(title_words & title_tokens)
+    title_score = min(20, overlap * 8)
+
+    # ---- Seniority (0 to 10, or negative) ----
+    job_seniority = title_seniority(title)
+    if job_seniority == "senior" and candidate_years < 5:
+        seniority_score = -30  # Hard penalty
+    elif job_seniority == "mid" and candidate_years < 2:
+        seniority_score = -15
+    elif job_seniority == "open":
+        seniority_score = 5   # Slight boost for matching seniority
+    else:
+        seniority_score = 10  # Good match
+
+    total = primary_score + secondary_score + title_score + seniority_score
+    total = max(0, min(100, total))
+
+    return {
+        "score": total,
+        "primary_hits": primary_hits,
+        "matched_primary": matched_primary[:5],  # For debugging
+        "secondary_hits": secondary_hits,
+        "title_overlap": overlap,
+        "seniority": job_seniority,
+    }
+
+
+# ============================================
+# NON-ENGLISH FILTER
+# ============================================
+
+NON_ENGLISH_MARKERS = [
+    "(m/w/d)", "vollzeit", "teilzeit", "praktikum",
+    "estagiário", "desenvolvedor", "analista de",
+    "desarrollador", "ingeniero de", "practicante",
+    "développeur", "ingénieur", "stagiaire",
+    "medewerker", "vacature",
 ]
 
-REMOTE_SIGNALS = [
-    "remote", "work from home", "wfh", "anywhere",
-    "distributed", "fully remote", "remote-first",
-]
-
-
-def classify_location(job: dict) -> str:
-    """Classify job as 'india', 'remote', or 'other'."""
-    loc = (job.get("location", "") or "").lower()
-    title = job.get("title", "").lower()
-    summary = (job.get("summary", "") or "")[:500].lower()
-    combined = f"{loc} {title} {summary}"
-
-    if any(s in combined for s in INDIA_SIGNALS):
-        return "india"
-    if any(s in combined for s in REMOTE_SIGNALS):
-        return "remote"
-    return "other"
+def is_non_english(title, summary):
+    text = (title + " " + summary).lower()
+    return any(m in text for m in NON_ENGLISH_MARKERS)
 
 
 # ============================================
-# SEMANTIC SCORING WITH RETRY & RATE LIMITING
+# LLM BATCH SCORING (only for top candidates)
 # ============================================
 
-def semantic_score(job: dict, profile_text: str, candidate_years: int = 2, max_retries: int = 3) -> int:
-    """
-    Score match between candidate and job with retry logic and rate limiting.
-    Now includes seniority awareness in the prompt.
-    """
-    # Truncate long job descriptions
-    summary = job.get("summary", "")[:2000]
-    title = job.get("title", "Unknown")
-    location = classify_location(job)
+def build_batch_prompt(batch, profile, candidate_years):
+    name = str(profile.get("name", "Candidate"))[:100]
+    headline = str(profile.get("headline", ""))[:200]
+    skills = profile.get("skills", [])
+    skills_str = ", ".join(str(s)[:50] for s in skills[:20])
 
-    prompt = f"""Score match between candidate and job from 0-100. Be strict.
+    job_entries = []
+    for idx, job in enumerate(batch, 1):
+        title = job.get("title", "Unknown")
+        company = job.get("company", "Unknown")
+        summary = re.sub(r'<[^>]+>', ' ', job.get("summary", ""))[:400]
+        summary = re.sub(r'\s+', ' ', summary).strip()
+        job_entries.append(
+            f"JOB_{idx}: {title} at {company}\n  {summary[:300]}"
+        )
 
-Candidate:
-{profile_text}
-Experience: approximately {candidate_years} years
+    jobs_block = "\n\n".join(job_entries)
 
-Job Title: {title}
-Job Location: {location}
-Job Description:
-{summary}
+    return f"""You are a strict, realistic recruiter scoring job fit. Score each job 0-100.
 
-CRITICAL SCORING RULES:
-- If the job title contains "Lead", "Director", "VP", "Head of", "Principal", "Staff"
-  and the candidate has less than 5 years experience, score 30-50 MAX.
-- If the job title contains "Senior" or "Manager" and the candidate has less than
-  3 years experience, score 45-60 MAX.
-- Seniority mismatch OVERRIDES skill overlap. Wrong level = low score.
-- "Specialist", "Associate", "Coordinator", "Executive" roles fit 1-4 years well.
-- Strategy/GTM/Revenue Operations Lead roles require 7-10+ years.
+CANDIDATE PROFILE:
+Name: {name}
+Title: {headline}
+Experience: ~{candidate_years} years
+Skills: {skills_str}
 
-LOCATION BONUS:
-- If location is "india" or "remote", add +5 to the score.
+JOBS TO SCORE:
+{jobs_block}
 
-Return ONLY a number between 0 and 100.
-"""
+SCORING CRITERIA (be strict — most jobs should score 40-65):
 
-    for attempt in range(max_retries):
-        try:
-            res = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
-                max_tokens=5,
-            )
+85-100: Near-perfect fit. Same domain, 4+ skill matches, correct seniority level.
+70-84:  Strong fit. Same or adjacent domain, 3+ skills, reasonable seniority.
+55-69:  Decent fit. Related domain, 2+ relevant skills.
+40-54:  Weak. Some skill overlap but different domain or role type.
+0-39:   No fit. Different field entirely.
 
-            score_text = res.choices[0].message.content.strip()
+SENIORITY RULES (non-negotiable):
+- Candidate has ~{candidate_years} years experience.
+- Jobs with "Lead", "Director", "VP", "Head of", "Principal", "Staff" require 7+ years → cap at 40 if candidate has <5yr.
+- Jobs with "Senior", "Manager" require 4+ years → cap at 55 if candidate has <3yr.
+- A job can have perfect skill overlap but WRONG seniority = score 35-50.
 
-            # Extract numeric score safely
-            digits = "".join(c for c in score_text if c.isdigit())
+Return ONLY scores in this exact format, one per line:
+{chr(10).join(f"JOB_{i}: <score>" for i in range(1, len(batch) + 1))}
 
-            if digits:
-                score = max(0, min(100, int(digits)))
-                logger.debug(f"Scored job '{job.get('title')}': {score}")
-                return score
+Numbers only. No explanations. No extra text."""
 
-            logger.warning(f"No numeric score in response: {score_text}")
-            return 0
 
-        except Exception as e:
-            error_msg = str(e).lower()
-            
-            # Check for rate limit
-            if "rate" in error_msg or "limit" in error_msg:
-                wait_time = (2 ** attempt) * 2  # Exponential backoff: 2s, 4s, 8s
-                logger.warning(f"Rate limited, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-            elif attempt < max_retries - 1:
-                logger.warning(f"Scoring failed (attempt {attempt + 1}/{max_retries}): {e}")
-                time.sleep(1)
-            else:
-                logger.error(f"Semantic scoring failed after {max_retries} attempts: {e}")
-                return 0
-    
-    return 0
+def parse_batch_scores(text, batch_size):
+    scores = [0] * batch_size
+    for line in text.strip().split("\n"):
+        m = re.match(r'(?:JOB[_\s]*)?(\d+)\s*[:.\-)\]]\s*(\d+)', line.strip(), re.IGNORECASE)
+        if m:
+            idx = int(m.group(1)) - 1
+            score = max(0, min(100, int(m.group(2))))
+            if 0 <= idx < batch_size:
+                scores[idx] = score
+    return scores
+
+
+def llm_batch_score(batch, profile, candidate_years):
+    """Score a batch of jobs using LLM. Returns list of scores."""
+    prompt = build_batch_prompt(batch, profile, candidate_years)
+    try:
+        res = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=300,  # Enough for 15 job scores
+        )
+        text = res.choices[0].message.content.strip()
+        scores = parse_batch_scores(text, len(batch))
+        # Fallback: extract any numbers if parsing failed
+        if sum(scores) == 0 and len(batch) > 1:
+            numbers = re.findall(r'\b(\d{1,3})\b', text)
+            if len(numbers) >= len(batch):
+                scores = [max(0, min(100, int(n))) for n in numbers[:len(batch)]]
+        return scores
+    except Exception as e:
+        logger.error(f"LLM scoring failed: {e}")
+        return [0] * len(batch)
 
 
 # ============================================
-# CORE PIPELINE
+# UTILITIES
 # ============================================
 
-def run_pipeline(
-    profile_file: str,
-    jobs_file: str,
-    session_dir: str,
-    letters_dir: str = None,
-    progress_callback=None
-) -> list:
-    """
-    Main job matching pipeline with proper error handling.
-    """
-    
-    # ---- Load profile ----
-    if not os.path.exists(profile_file):
-        raise FileNotFoundError(f"Profile file not found: {profile_file}")
+def create_job_id(job):
+    raw = "|".join([job.get("company", ""), job.get("title", ""), job.get("apply_url", "")[:100]])
+    return hashlib.md5(raw.encode()).hexdigest()[:16]
 
-    with open(profile_file, "r", encoding="utf-8") as f:
-        profile = json.load(f)
-    
-    logger.info(f"Loaded profile: {profile.get('name', 'Unknown')}")
+def profile_hash(profile):
+    relevant = {"name": profile.get("name", ""), "headline": profile.get("headline", ""),
+                "skills": sorted(profile.get("skills", []))}
+    return hashlib.md5(json.dumps(relevant, sort_keys=True).encode()).hexdigest()
 
-    # ---- Fetch jobs if not present ----
-    if not os.path.exists(jobs_file):
-        logger.info("Jobs file not found, fetching from sources...")
-        if progress_callback:
-            progress_callback("Fetching jobs from remote sources...")
-        
-        from job_fetcher import fetch_all
-        try:
-            fetch_all(output_path=jobs_file)
-            logger.info(f"Jobs fetched and saved to {jobs_file}")
-        except Exception as e:
-            logger.error(f"Failed to fetch jobs: {e}")
-            raise RuntimeError(f"Could not fetch jobs: {e}")
-
-    # ---- Load jobs ----
-    with open(jobs_file, "r", encoding="utf-8") as f:
-        jobs = json.load(f)
-
-    if not jobs:
-        logger.warning("No jobs found")
-        return []
-    
-    logger.info(f"Loaded {len(jobs)} jobs")
-
-    # ---- Deduplicate jobs ----
-    jobs = deduplicate_jobs(jobs)
-
-    # ---- Estimate candidate experience ----
-    candidate_years = estimate_candidate_years(profile)
-    logger.info(f"Estimated experience: ~{candidate_years} years")
-    if progress_callback:
-        progress_callback(f"Estimated experience: ~{candidate_years} years")
-
-    # ---- Pre-filter: seniority + location ----
-    filtered_jobs = []
-    stats = {"too_senior": 0, "wrong_location": 0, "passed": 0}
-
+def deduplicate_jobs(jobs):
+    seen = set()
+    unique = []
     for job in jobs:
-        title = job.get("title", "")
-        loc = classify_location(job)
+        key = (job.get("company", "").lower().strip(), job.get("title", "").lower().strip())
+        if key not in seen and key != ("", ""):
+            seen.add(key)
+            unique.append(job)
+    logger.info(f"Deduplicated {len(jobs)} → {len(unique)}")
+    return unique
 
-        # Kill senior roles for junior candidates
-        if candidate_years < 3 and detect_seniority(title) == "senior":
-            stats["too_senior"] += 1
-            continue
-
-        # Deprioritize non-India/non-Remote (but don't kill — these sources are mostly remote)
-        # WeWorkRemotely, RemoteOK, Remotive are all remote job boards
-        # so most jobs should classify as 'remote' anyway
-        job["_location"] = loc
-        filtered_jobs.append(job)
-        stats["passed"] += 1
-
-    logger.info(f"Pre-filter: {len(jobs)} → {stats['passed']} "
-                f"(killed {stats['too_senior']} too-senior)")
-    if progress_callback:
-        progress_callback(f"Pre-filter: {len(jobs)} → {stats['passed']} jobs "
-                         f"({stats['too_senior']} too senior removed)")
-
-    jobs = filtered_jobs
-
-    # ---- Profile hash for cache isolation ----
-    p_hash = profile_hash(profile)
-    logger.info(f"Profile hash: {p_hash}")
-
-    # ---- Load cache ----
-    cache_file = os.path.join(session_dir, "semantic_cache.json")
-    cache = {}
-
-    if os.path.exists(cache_file):
-        try:
-            # Safety check: limit cache file size
-            if os.path.getsize(cache_file) > 10 * 1024 * 1024:  # 10MB
-                logger.warning("Cache file too large, resetting")
-            else:
-                with open(cache_file, "r", encoding="utf-8") as f:
-                    cache = json.load(f)
-                logger.info(f"Loaded cache with {len(cache)} entries")
-        except Exception as e:
-            logger.warning(f"Failed to load cache: {e}")
-            cache = {}
-
-    # ---- Build profile text ----
-    profile_text = build_safe_profile_text(profile)
-
-    # ---- Score jobs ----
-    matches = []
-    total_jobs = len(jobs)
-    cache_hits = 0
-    
-    if progress_callback:
-        progress_callback(f"Scoring {total_jobs} jobs...")
-
-    for idx, job in enumerate(jobs, 1):
-        # Progress update every 10 jobs
-        if progress_callback and idx % 10 == 0:
-            progress_callback(
-                f"Scoring jobs... {idx}/{total_jobs} ({idx*100//total_jobs}%) - "
-                f"{len(matches)} matches found"
-            )
-
-        # Create unique job ID
-        job_id = create_job_id(job)
-        cache_key = f"{p_hash}_{job_id}"
-
-        # Check cache first
-        if cache_key in cache:
-            score = cache[cache_key]
-            cache_hits += 1
-        else:
-            # Score with rate limiting
-            score = semantic_score(job, profile_text, candidate_years=candidate_years)
-            cache[cache_key] = score
-            
-            # Rate limit between API calls
-            time.sleep(API_RATE_LIMIT)
-
-        # Add to matches if above threshold
-        if score >= MATCH_THRESHOLD:
-            # Create copy to avoid mutation
-            matched_job = job.copy()
-            matched_job["match_score"] = score
-            matches.append(matched_job)
-
-    logger.info(f"Scoring complete: {len(matches)} matches from {total_jobs} jobs")
-    logger.info(f"Cache hit rate: {cache_hits}/{total_jobs} ({cache_hits*100//total_jobs if total_jobs > 0 else 0}%)")
-
-    # ---- Sort and limit matches ----
-    matches.sort(key=lambda x: x["match_score"], reverse=True)
-
-    # ---- Enforce company diversity (max 3 per company) ----
-    MAX_PER_COMPANY = 3
+def enforce_company_diversity(matches):
     company_count = {}
-    diverse_matches = []
+    diverse = []
     for m in matches:
         co = m.get("company", "Unknown").lower().strip()
         company_count[co] = company_count.get(co, 0) + 1
         if company_count[co] <= MAX_PER_COMPANY:
-            diverse_matches.append(m)
-    matches = diverse_matches
+            diverse.append(m)
+    return diverse
 
+
+# ============================================
+# PIPELINE
+# ============================================
+
+def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progress_callback=None):
+    if not os.path.exists(profile_file):
+        raise FileNotFoundError(f"Profile not found: {profile_file}")
+
+    with open(profile_file, "r", encoding="utf-8") as f:
+        profile = json.load(f)
+
+    candidate_years = estimate_years(profile)
+    logger.info(f"Profile: {profile.get('name', '?')} — {len(profile.get('skills', []))} skills, ~{candidate_years}yr")
+    if progress_callback:
+        progress_callback(f"Profile loaded: ~{candidate_years} years experience")
+
+    # ---- Fetch jobs if needed ----
+    if not os.path.exists(jobs_file):
+        if progress_callback:
+            progress_callback("Fetching jobs from all sources...")
+        from job_fetcher import fetch_all
+        fetch_all(output_path=jobs_file)
+
+    with open(jobs_file, "r", encoding="utf-8") as f:
+        jobs = json.load(f)
+    if not jobs:
+        return [], 0
+
+    jobs = deduplicate_jobs(jobs)
+    total_unique = len(jobs)
+    if progress_callback:
+        progress_callback(f"Loaded {total_unique} unique jobs")
+
+    # ---- Extract keywords from profile ----
+    primary_kw, secondary_kw, title_words = extract_profile_keywords(profile)
+    logger.info(f"Keywords — primary: {len(primary_kw)}, secondary: {len(secondary_kw)}, title: {len(title_words)}")
+    logger.info(f"Primary keywords: {sorted(primary_kw)[:15]}")
+    if progress_callback:
+        progress_callback(f"Matching against {len(primary_kw)} primary keywords...")
+
+    # ---- Phase 1: Local keyword scoring (0 API calls) ----
+    scored_jobs = []
+    filtered_stats = {"non_english": 0, "too_senior": 0, "low_score": 0, "passed": 0}
+
+    for job in jobs:
+        title = job.get("title", "")
+        summary = job.get("summary", "")
+
+        if is_non_english(title, summary):
+            filtered_stats["non_english"] += 1
+            continue
+
+        # Hard seniority kill
+        if candidate_years < 3 and title_seniority(title) == "senior":
+            filtered_stats["too_senior"] += 1
+            continue
+
+        local = score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_years)
+
+        if local["score"] < MATCH_THRESHOLD:
+            filtered_stats["low_score"] += 1
+            continue
+
+        job["_local_score"] = local["score"]
+        job["_local_detail"] = local
+        scored_jobs.append(job)
+        filtered_stats["passed"] += 1
+
+    # Sort by local score
+    scored_jobs.sort(key=lambda j: j.get("_local_score", 0), reverse=True)
+
+    logger.info(f"Phase 1 (local): {total_unique} → {filtered_stats['passed']} passed "
+                f"({filtered_stats['too_senior']} seniority, {filtered_stats['low_score']} low score, "
+                f"{filtered_stats['non_english']} non-English)")
+    if progress_callback:
+        progress_callback(
+            f"Keyword matching: {filtered_stats['passed']} relevant jobs found "
+            f"({filtered_stats['too_senior']} too senior, {filtered_stats['low_score']} filtered)"
+        )
+
+    if not scored_jobs:
+        if progress_callback:
+            progress_callback("No relevant jobs found. Your profile may be too niche for these job boards.")
+        return [], total_unique
+
+    # ---- Phase 2: LLM scoring for top candidates only ----
+    top_candidates = scored_jobs[:MAX_LLM_CANDIDATES]
+
+    if progress_callback:
+        progress_callback(f"Sending top {len(top_candidates)} to LLM for final scoring...")
+
+    # Cache
+    p_hash = profile_hash(profile)
+    cache_file = os.path.join(session_dir, "semantic_cache.json")
+    cache = {}
+    if os.path.exists(cache_file):
+        try:
+            if os.path.getsize(cache_file) < 10 * 1024 * 1024:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cache = json.load(f)
+        except Exception:
+            pass
+
+    # Separate cached vs uncached
+    uncached = []
+    cached_results = []
+    for job in top_candidates:
+        jid = create_job_id(job)
+        ck = f"v6_{p_hash}_{jid}"
+        job["_cache_key"] = ck
+        if ck in cache:
+            cached_results.append((job, cache[ck]))
+        else:
+            uncached.append(job)
+
+    logger.info(f"Cache: {len(cached_results)} hits, {len(uncached)} to score")
+
+    # Batch score uncached
+    api_calls = 0
+    scored_results = []
+    for i in range(0, len(uncached), LLM_BATCH_SIZE):
+        batch = uncached[i:i + LLM_BATCH_SIZE]
+        bn = i // LLM_BATCH_SIZE + 1
+        tb = (len(uncached) + LLM_BATCH_SIZE - 1) // LLM_BATCH_SIZE
+
+        if progress_callback:
+            titles = [f"{j.get('company','?')[:15]}: {j.get('title','?')[:30]}" for j in batch]
+            progress_callback(f"Batch {bn}/{tb}: {', '.join(titles)}")
+
+        scores = llm_batch_score(batch, profile, candidate_years)
+        api_calls += 1
+
+        for job, llm_score in zip(batch, scores):
+            # Combine local + LLM scores (60% local, 40% LLM)
+            local_score = job.get("_local_score", 0)
+            combined = int(local_score * 0.6 + llm_score * 0.4)
+
+            ck = job.get("_cache_key", "")
+            if ck:
+                cache[ck] = combined
+            scored_results.append((job, combined))
+
+            logger.info(f"  {job.get('company','?')[:20]}: {job.get('title','?')[:35]} "
+                        f"→ local={local_score}, llm={llm_score}, combined={combined}")
+
+        if progress_callback:
+            progress_callback(f"  → LLM scores: [{', '.join(str(s) for s in scores)}]")
+
+        if i + LLM_BATCH_SIZE < len(uncached):
+            time.sleep(API_RATE_LIMIT)
+
+    # Also add combined scores for cached results
+    all_results = []
+    for job, cached_score in cached_results:
+        all_results.append((job, cached_score))
+    all_results.extend(scored_results)
+
+    # ---- Phase 3: Filter, diversify, sort ----
+    FINAL_THRESHOLD = 60  # Combined score threshold
+
+    matches = []
+    for job, score in all_results:
+        if score >= FINAL_THRESHOLD:
+            m = job.copy()
+            m.pop("_local_score", None)
+            m.pop("_local_detail", None)
+            m.pop("_cache_key", None)
+            m["match_score"] = score
+            matches.append(m)
+
+    matches.sort(key=lambda x: x["match_score"], reverse=True)
+    matches = enforce_company_diversity(matches)
     matches = matches[:MAX_MATCHES]
-    
-    logger.info(f"Top {len(matches)} matches selected")
+
+    logger.info(f"Final: {len(matches)} matches from {len(top_candidates)} candidates ({api_calls} API calls)")
+    if progress_callback:
+        progress_callback(f"✅ {len(matches)} matches found ({api_calls} API calls)")
 
     # ---- Save cache ----
     os.makedirs(session_dir, exist_ok=True)
-
     try:
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2, ensure_ascii=False)
-        logger.info(f"Cache saved with {len(cache)} entries")
     except Exception as e:
-        logger.error(f"Failed to save cache: {e}")
+        logger.error(f"Cache save: {e}")
 
-    # ---- Generate cover letters ----
+    # ---- Cover letters ----
     if not letters_dir:
         letters_dir = os.path.join(session_dir, "cover_letters")
     os.makedirs(letters_dir, exist_ok=True)
 
-    if progress_callback:
+    if matches and progress_callback:
         progress_callback(f"Generating {len(matches)} cover letters...")
 
-    for job in matches:
+    for j in matches:
         try:
-            generate_cover_letter(job, profile, letters_dir)
+            generate_cover_letter(j, profile, letters_dir)
         except Exception as e:
-            logger.error(f"Cover letter generation failed for {job.get('title')}: {e}")
+            logger.error(f"Cover letter: {j.get('title')}: {e}")
 
-    return matches, total_jobs  # Return both matches and total count
+    return matches, total_unique
 
 
 # ============================================
-# COMPATIBILITY WRAPPER (FOR STREAMLIT UI)
+# STREAMLIT WRAPPER
 # ============================================
 
-def run_auto_apply_pipeline(
-    profile_file=None,
-    jobs_file=None,
-    matches_file=None,
-    cache_file=None,
-    log_file=None,
-    letters_dir=None,
-    progress_callback=None,
-):
-    """
-    Wrapper to maintain compatibility with Streamlit dashboard.
-    """
-
+def run_auto_apply_pipeline(profile_file=None, jobs_file=None, matches_file=None,
+                            cache_file=None, log_file=None, letters_dir=None,
+                            progress_callback=None):
     try:
         if progress_callback:
-            progress_callback("Loading profile and jobs...")
+            progress_callback("Starting pipeline...")
 
         session_dir = os.path.dirname(profile_file)
-
-        matches, total_scored = run_pipeline(
-            profile_file=profile_file,
-            jobs_file=jobs_file,
-            session_dir=session_dir,
-            letters_dir=letters_dir,
+        matches, total = run_pipeline(
+            profile_file=profile_file, jobs_file=jobs_file,
+            session_dir=session_dir, letters_dir=letters_dir,
             progress_callback=progress_callback,
         )
 
-        # ---- Save matches if UI expects file ----
         if matches_file:
             os.makedirs(os.path.dirname(matches_file) or ".", exist_ok=True)
             with open(matches_file, "w", encoding="utf-8") as f:
                 json.dump(matches, f, indent=2, ensure_ascii=False)
 
         if progress_callback:
-            progress_callback(f"Done - {len(matches)} matches found from {total_scored} jobs.")
+            progress_callback(f"Done — {len(matches)} matches from {total} jobs.")
 
-        return {
-            "status": "success",
-            "matches": len(matches),
-            "total_scored": total_scored,
-        }
+        if not matches:
+            return {"status": "no_matches", "matches": 0, "total_scored": total}
+        return {"status": "success", "matches": len(matches), "total_scored": total}
 
     except Exception as e:
         logger.exception("Pipeline error")
-        
         if progress_callback:
-            progress_callback(f"Pipeline error: {e}")
+            progress_callback(f"Error: {e}")
+        return {"status": "error", "message": str(e)}
 
-        return {
-            "status": "error",
-            "message": str(e),
-        }
-
-
-# ============================================
-# CLI ENTRY (FOR TESTING)
-# ============================================
 
 if __name__ == "__main__":
     import sys
-    
-    # Simple CLI test
     if len(sys.argv) < 3:
         print("Usage: python run_auto_apply.py <profile.json> <jobs.json>")
         sys.exit(1)
-
-    test_profile = sys.argv[1]
-    test_jobs = sys.argv[2]
-    session_dir = "data/test_session"
-
     try:
-        matches, total = run_pipeline(
-            profile_file=test_profile,
-            jobs_file=test_jobs,
-            session_dir=session_dir,
-        )
-
-        print(f"\n✅ Success!")
-        print(f"Matches found: {len(matches)} from {total} jobs")
-        
-        for i, job in enumerate(matches, 1):
-            print(f"{i}. {job['company']} - {job['title']} ({job['match_score']}%)")
-    
+        matches, total = run_pipeline(sys.argv[1], sys.argv[2], "data/test_session")
+        print(f"\n✅ {len(matches)} matches from {total} jobs")
+        for i, j in enumerate(matches, 1):
+            print(f"  {i}. [{j['match_score']}%] {j['company']} — {j['title']}")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n❌ {e}")
         sys.exit(1)

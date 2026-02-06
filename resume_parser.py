@@ -26,7 +26,7 @@ client = OpenAI(
     api_key=api_key,
 )
 
-MODEL = "mistralai/mistral-7b-instruct"
+MODEL = "google/gemini-2.0-flash-exp:free"
 
 # =========================
 # TEXT HELPERS
@@ -107,16 +107,21 @@ def extract_profile_with_llm(text):
     prompt = f"""Extract the following from this resume and return ONLY valid JSON:
 
 1. name: Full name of the candidate
-2. headline: Professional headline or current title
-3. skills: List of professional skills (tools, technologies, soft skills, domains)
+2. headline: Current job title or professional headline (e.g. "IT Consultant" or "Customer Support Specialist")
+3. skills: List of SPECIFIC, MATCHABLE professional skills
 
-Rules:
-- Return ONLY a JSON object with keys: "name", "headline", "skills"
-- "skills" must be an array of strings
-- No duplicates in skills
-- Include technical skills, tools, frameworks, soft skills, and domain knowledge
-- If you can't find name or headline, use empty string
-- Do NOT include any explanatory text, just the JSON
+SKILLS RULES — this is critical:
+- Include specific tools and platforms: "Oracle OMS", "Zendesk", "JIRA", "Salesforce", "SQL"
+- Include specific domains: "order management", "marketplace integration", "incident management"  
+- Include specific methodologies: "ITIL", "Agile", "SLA management", "root cause analysis"
+- Include specific technologies: "SOA Suite", "REST API", "SOAP", "Linux"
+- DO NOT include soft skills like "communication", "leadership", "problem solving", "teamwork"
+- DO NOT include generic terms like "Microsoft Office", "email", "Google Docs"
+- DO NOT include languages spoken like "English", "Hindi"
+- Each skill should be something a recruiter would SEARCH FOR in a job posting
+
+Return ONLY a JSON object:
+{{"name": "...", "headline": "...", "skills": ["specific skill 1", "specific skill 2", ...]}}
 
 Resume text:
 {text[:6000]}
