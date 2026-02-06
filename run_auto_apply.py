@@ -654,18 +654,9 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         logger.error(f"Cache save: {e}")
 
     # ---- Cover letters ----
-    if not letters_dir:
-        letters_dir = os.path.join(session_dir, "cover_letters")
-    os.makedirs(letters_dir, exist_ok=True)
-
-    if matches and progress_callback:
-        progress_callback(f"Generating {len(matches)} cover letters...")
-
-    for j in matches:
-        try:
-            generate_cover_letter(j, profile, letters_dir)
-        except Exception as e:
-            logger.error(f"Cover letter: {j.get('title')}: {e}")
+    # NOTE: Cover letters are no longer auto-generated in the pipeline
+    # They're generated on-demand when user clicks "Generate Cover Letters" in UI
+    # This saves API costs and gives users control over when/which letters to generate
 
     return matches, total_unique
 

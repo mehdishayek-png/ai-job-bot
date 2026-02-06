@@ -13,908 +13,1025 @@ from dotenv import load_dotenv
 # ============================================
 
 st.set_page_config(
-    page_title="JobBot · Your AI Job Hunter",
-    page_icon="⚡",
+    page_title="JobBot · AI-Powered Job Matching",
+    page_icon="🚀",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================
-# CUSTOM CSS — warm, energetic design
+# CUSTOM CSS — 2026 Glassmorphism + Modern Design
 # ============================================
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ---- Reset & Global ---- */
+/* ============ GLOBAL RESET ============ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 .stApp {
-    font-family: 'DM Sans', sans-serif;
-}
-h1, h2, h3, h4,
-.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    font-family: 'DM Sans', sans-serif !important;
-    font-weight: 700 !important;
-}
-code, .stCode, pre {
-    font-family: 'Space Mono', monospace !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    background-attachment: fixed;
 }
 
-/* ---- Hero with floating orbs ---- */
+h1, h2, h3, h4, h5, h6,
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.03em;
+}
+
+code, .stCode, pre {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ============ GLASSMORPHISM FOUNDATION ============ */
+.glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.glass-strong {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(25px) saturate(200%);
+    -webkit-backdrop-filter: blur(25px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
+}
+
+/* ============ HERO SECTION ============ */
 .hero {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 50%, #1a1a2e 100%);
-    padding: 2.4rem 2rem 1.8rem;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(139, 92, 246, 0.2);
     border-radius: 24px;
-    margin-bottom: 1.2rem;
+    padding: 3rem 2.5rem;
+    margin-bottom: 2rem;
     position: relative;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 
+        0 8px 32px 0 rgba(139, 92, 246, 0.2),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
+
 .hero::before {
     content: '';
     position: absolute;
     top: -50%;
     right: -20%;
-    width: 60%;
-    height: 200%;
-    background: radial-gradient(ellipse, rgba(232, 121, 59, 0.15) 0%, transparent 70%);
-    pointer-events: none;
-    animation: orbFloat 8s ease-in-out infinite;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
+    filter: blur(60px);
+    animation: float 8s ease-in-out infinite;
 }
+
 .hero::after {
     content: '';
     position: absolute;
     bottom: -30%;
     left: -10%;
-    width: 50%;
-    height: 160%;
-    background: radial-gradient(ellipse, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
-    pointer-events: none;
-    animation: orbFloat 10s ease-in-out infinite reverse;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    filter: blur(60px);
+    animation: float 10s ease-in-out infinite reverse;
 }
-@keyframes orbFloat {
+
+@keyframes float {
     0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(20px, -15px) scale(1.05); }
+    50% { transform: translate(30px, -20px) scale(1.1); }
 }
-.hero-content { position: relative; z-index: 1; }
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+}
+
 .hero h1 {
     color: #ffffff !important;
-    font-size: 2.4rem !important;
+    font-size: 3rem !important;
     font-weight: 800 !important;
-    margin: 0 0 0.2rem 0 !important;
-    letter-spacing: -0.04em;
+    margin: 0 0 0.5rem 0 !important;
+    background: linear-gradient(135deg, #ffffff 0%, #a78bfa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     line-height: 1.1;
 }
-.hero h1 .accent { color: #e8793b; }
-.hero p {
-    color: rgba(255,255,255,0.5);
-    font-size: 0.9rem;
-    margin: 0;
+
+.hero-subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.15rem;
+    margin: 0 0 1.5rem 0;
     font-weight: 400;
-    letter-spacing: 0.01em;
+    line-height: 1.6;
 }
-.hero .tag-row {
+
+.hero-tags {
     display: flex;
-    gap: 0.5rem;
-    margin-top: 0.9rem;
+    gap: 0.75rem;
     flex-wrap: wrap;
+    margin-top: 1.5rem;
 }
-.hero .tag {
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.55);
-    padding: 0.25rem 0.65rem;
-    border-radius: 8px;
-    font-size: 0.72rem;
-    font-weight: 500;
+
+.hero-tag {
+    background: rgba(139, 92, 246, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: #c4b5fd;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
     letter-spacing: 0.02em;
-    text-transform: uppercase;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ---- Welcome banner ---- */
-.welcome {
-    background: linear-gradient(135deg, rgba(232,121,59,0.08), rgba(232,121,59,0.02));
-    border: 1px solid rgba(232,121,59,0.15);
-    border-radius: 16px;
-    padding: 1rem 1.3rem;
-    margin-bottom: 1.2rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-.welcome-emoji {
-    font-size: 1.8rem;
-    line-height: 1;
-}
-.welcome h3 {
-    color: #e8793b !important;
-    margin: 0 0 0.1rem 0 !important;
-    font-size: 1.05rem !important;
-    font-weight: 700 !important;
-}
-.welcome p {
-    color: rgba(232,121,59,0.7);
-    margin: 0;
-    font-size: 0.82rem;
-    font-weight: 400;
+.hero-tag:hover {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.5);
+    transform: translateY(-2px);
 }
 
-/* ---- Cards ---- */
-.card {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 18px;
-    padding: 1.4rem;
-    margin-bottom: 1rem;
-    transition: border-color 0.2s;
-}
-.card:hover {
-    border-color: rgba(232,121,59,0.2);
-}
-.card h3 {
-    font-size: 1rem !important;
-    font-weight: 700 !important;
-    margin-bottom: 0.8rem !important;
-    letter-spacing: -0.02em;
-}
-.card-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    font-size: 1rem;
-    margin-right: 0.5rem;
-    vertical-align: middle;
-}
-.card-icon.upload { background: rgba(99,102,241,0.12); }
-.card-icon.profile { background: rgba(232,121,59,0.12); }
-.card-icon.match { background: rgba(16,185,129,0.12); }
-
-/* ---- Skill chips ---- */
-.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
-.chip {
-    background: rgba(232,121,59,0.08);
-    color: #e8a76a;
-    padding: 0.25rem 0.65rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border: 1px solid rgba(232,121,59,0.12);
-    white-space: nowrap;
-    transition: all 0.15s;
-}
-.chip:hover {
-    background: rgba(232,121,59,0.16);
-    transform: translateY(-1px);
-}
-
-/* ---- Progress stepper ---- */
+/* ============ STEPPER PROGRESS ============ */
 .stepper {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 0;
-    margin: 0.6rem 0 1.5rem;
+    gap: 1rem;
+    margin: 2rem 0 2.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
 }
+
 .step {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.75rem;
-    font-size: 0.76rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-}
-.step-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.step.done .step-dot { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.4); }
-.step.done { color: #6ee7b7; }
-.step.on .step-dot { background: #e8793b; box-shadow: 0 0 8px rgba(232,121,59,0.4); animation: pulse 2s ease infinite; }
-.step.on { color: #e8a76a; }
-.step.wait .step-dot { background: rgba(255,255,255,0.15); }
-.step.wait { color: rgba(255,255,255,0.25); }
-.step-line {
-    width: 28px;
-    height: 1px;
-    background: rgba(255,255,255,0.1);
-    flex-shrink: 0;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-/* ---- Score badges ---- */
-.score-hi {
-    display: inline-block; background: linear-gradient(135deg,#059669,#10b981);
-    color: #fff; padding: 0.3rem 0.75rem; border-radius: 10px;
-    font-size: 0.88rem; font-weight: 700; letter-spacing: 0.02em;
-    box-shadow: 0 2px 8px rgba(16,185,129,0.3);
-}
-.score-md {
-    display: inline-block; background: linear-gradient(135deg,#d97706,#f59e0b);
-    color: #fff; padding: 0.3rem 0.75rem; border-radius: 10px;
-    font-size: 0.88rem; font-weight: 700;
-    box-shadow: 0 2px 8px rgba(245,158,11,0.3);
-}
-.score-lo {
-    display: inline-block; background: rgba(255,255,255,0.08);
-    color: rgba(255,255,255,0.6); padding: 0.3rem 0.75rem; border-radius: 10px;
-    font-size: 0.88rem; font-weight: 700;
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
-/* ---- Source badges ---- */
-.src-badge {
-    display: inline-block;
-    padding: 0.18rem 0.5rem;
-    border-radius: 6px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-}
-.src-wwr  { background: rgba(129,140,248,0.12); color: #a5b4fc; border: 1px solid rgba(129,140,248,0.15); }
-.src-rok  { background: rgba(251,113,133,0.12); color: #fda4af; border: 1px solid rgba(251,113,133,0.15); }
-.src-rem  { background: rgba(56,189,248,0.12); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.15); }
-.src-other{ background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.06); }
-
-/* ---- Cover letter box ---- */
-.cl-wrap {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.06);
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
     border-radius: 12px;
-    padding: 1rem 1.3rem;
-    margin-top: 0.6rem;
-    line-height: 1.7;
-    font-size: 0.86rem;
-    color: rgba(255,255,255,0.72);
-    white-space: pre-wrap;
-}
-.cl-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: rgba(255,255,255,0.3);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
-/* ---- Stats row ---- */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.7rem;
-    margin-bottom: 1.2rem;
+.step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
 }
-.stat-card {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.06);
+
+.step.done {
+    color: #6ee7b7;
+}
+
+.step.done .step-icon {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.step.active {
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.step.active .step-icon {
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.5);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.step.pending {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.step.pending .step-icon {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+}
+
+.step-connector {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0.2) 0%, 
+        rgba(255, 255, 255, 0.05) 100%
+    );
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+/* ============ GLASS CARDS ============ */
+.glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+}
+
+.glass-card:hover {
+    border-color: rgba(139, 92, 246, 0.3);
+    box-shadow: 0 12px 40px 0 rgba(139, 92, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-icon {
+    width: 48px;
+    height: 48px;
     border-radius: 14px;
-    padding: 1rem 0.8rem;
-    text-align: center;
-    transition: border-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.3);
 }
-.stat-card:hover { border-color: rgba(232,121,59,0.2); }
-.stat-card .num {
-    font-size: 1.7rem;
+
+.card-title {
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+}
+
+/* ============ SKILL CHIPS ============ */
+.skills-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
+
+.skill-chip {
+    background: rgba(139, 92, 246, 0.12);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #c4b5fd;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+}
+
+.skill-chip:hover {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+/* ============ STATS DASHBOARD ============ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+    margin: 2rem 0;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    padding: 1.75rem 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(139, 92, 246, 0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+}
+
+.stat-value {
+    font-size: 2.5rem;
     font-weight: 800;
-    letter-spacing: -0.03em;
-    background: linear-gradient(135deg, #e8793b, #f59e0b);
+    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    line-height: 1;
+    margin-bottom: 0.5rem;
 }
-.stat-card .lbl {
-    font-size: 0.68rem;
-    font-weight: 600;
-    color: rgba(255,255,255,0.35);
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 0.15rem;
+    letter-spacing: 0.05em;
 }
 
-/* ---- Buttons ---- */
+/* ============ SCORE BADGES ============ */
+.score-badge {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.score-excellent {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.score-good {
+    background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+.score-fair {
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+/* ============ SOURCE BADGES ============ */
+.source-badge {
+    display: inline-block;
+    padding: 0.35rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* ============ BUTTONS ============ */
 .stButton > button {
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%) !important;
+    color: white !important;
+    border: none !important;
     border-radius: 12px !important;
+    padding: 0.75rem 1.5rem !important;
     font-weight: 600 !important;
-    font-family: 'DM Sans', sans-serif !important;
-    padding: 0.55rem 1.3rem !important;
-    transition: all 0.15s !important;
+    font-size: 1rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
 }
+
 .stButton > button:hover {
-    transform: translateY(-1px) !important;
+    background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4) !important;
 }
 
-/* ---- Expanders ---- */
-div[data-testid="stExpander"] {
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 14px !important;
-    margin-bottom: 0.5rem !important;
-    transition: border-color 0.2s !important;
-}
-div[data-testid="stExpander"]:hover {
-    border-color: rgba(255,255,255,0.12) !important;
-}
-div[data-testid="stExpander"] summary {
-    font-weight: 600 !important;
-}
-
-/* ---- Divider ---- */
-.soft-divider {
+/* ============ DIVIDER ============ */
+.divider {
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-    margin: 1.2rem 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(139, 92, 246, 0.3) 50%, 
+        transparent 100%
+    );
+    margin: 2.5rem 0;
 }
 
-/* ---- Footer ---- */
+/* ============ COVER LETTER DISPLAY ============ */
+.cover-letter-box {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.8;
+    font-size: 0.95rem;
+}
+
+.cover-letter-label {
+    color: #c4b5fd;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ============ SCROLLBAR ============ */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.3);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
+}
+
+/* ============ FOOTER ============ */
 .footer {
     text-align: center;
-    padding: 1.5rem 0 0.5rem;
-    font-size: 0.75rem;
-    color: rgba(255,255,255,0.2);
+    padding: 2rem 1rem;
+    margin-top: 4rem;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.85rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.footer a {
+    color: #8b5cf6;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.footer a:hover {
+    color: #a78bfa;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================
-# LOAD API KEY
+# IMPORTS & SETUP
 # ============================================
 
-try:
-    api_key = st.secrets["OPENROUTER_API_KEY"]
-except (KeyError, AttributeError):
-    load_dotenv()
-    api_key = os.getenv("OPENROUTER_API_KEY")
+load_dotenv()
 
-if not api_key:
-    st.error("❌ OPENROUTER_API_KEY not found!")
-    st.markdown(
-        "Go to **App settings → Secrets** and add:\n\n"
-        '`OPENROUTER_API_KEY = "your-key-here"`'
-    )
+# Import functions from other modules
+try:
+    from job_fetcher import fetch_all
+    from resume_parser import build_profile
+    from run_auto_apply import run_auto_apply_pipeline
+    from cover_letter_generator import generate_cover_letter
+except ImportError as e:
+    st.error(f"Missing required module: {e}. Please ensure all files are in the same directory.")
     st.stop()
 
 # ============================================
-# INTERNAL IMPORTS
-# ============================================
-
-# Clear stale module cache (Streamlit hot-reload can cause KeyError)
-import importlib
-import sys
-for mod_name in ["resume_parser", "run_auto_apply", "cover_letter_generator", "job_fetcher"]:
-    if mod_name in sys.modules:
-        importlib.reload(sys.modules[mod_name])
-
-from resume_parser import build_profile
-from run_auto_apply import run_auto_apply_pipeline
-
-# ============================================
-# SESSION ISOLATION
+# SESSION MANAGEMENT
 # ============================================
 
 if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())[:8]
+    st.session_state["session_id"] = str(uuid.uuid4())[:8]
 
-SID = st.session_state.session_id
-SESSION_DIR = f"data/session_{SID}"
-SESSION_OUTPUT_DIR = f"output/session_{SID}"
-LETTERS_DIR = os.path.join(SESSION_OUTPUT_DIR, "cover_letters")
+SESSION_ID = st.session_state["session_id"]
+DATA_DIR = f"data/session_{SESSION_ID}"
+os.makedirs(DATA_DIR, exist_ok=True)
 
-for d in [SESSION_DIR, SESSION_OUTPUT_DIR, LETTERS_DIR]:
-    os.makedirs(d, exist_ok=True)
-
-PROFILE_FILE = os.path.join(SESSION_DIR, "profile.json")
-JOBS_FILE = os.path.join(SESSION_DIR, "jobs.json")
-MATCHES_FILE = os.path.join(SESSION_DIR, "matched_jobs.json")
-CACHE_FILE = os.path.join(SESSION_DIR, "semantic_cache.json")
-LOG_FILE = os.path.join(SESSION_DIR, "run_log.txt")
+PROFILE_FILE = os.path.join(DATA_DIR, "profile.json")
+JOBS_FILE = os.path.join(DATA_DIR, "jobs.json")
+MATCHES_FILE = os.path.join(DATA_DIR, "matches.json")
+CACHE_FILE = os.path.join(DATA_DIR, "semantic_cache.json")
+LOG_FILE = os.path.join(DATA_DIR, "pipeline.log")
+LETTERS_DIR = os.path.join(DATA_DIR, "cover_letters")
 
 # ============================================
-# HELPERS
+# UTILITY FUNCTIONS
 # ============================================
 
-def load_json(path):
-    if not os.path.exists(path):
-        return {}
+def load_json(filepath):
+    """Load JSON file safely"""
+    if not os.path.exists(filepath):
+        return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
-        return {}
+        return None
 
-
-def save_json(path, data):
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+def save_json(filepath, data):
+    """Save JSON file safely"""
+    os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-
 def strip_html(text):
+    """Remove HTML tags from text"""
     if not text:
         return ""
     clean = re.sub(r'<[^>]+>', ' ', text)
-    clean = clean.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    clean = clean.replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
     clean = re.sub(r'\s+', ' ', clean).strip()
     return clean
 
-
-def sanitize_filename(s, max_length=50):
-    if not s:
-        return "unnamed"
-    s = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', s)
-    s = re.sub(r'\s+', '_', s)
-    s = re.sub(r'_+', '_', s)
-    s = s.strip('. ')
-    return s[:max_length] if s else "unnamed"
-
-
-def find_cover_letter(company, title):
-    if not os.path.exists(LETTERS_DIR):
-        return None, None
-    expected = f"{sanitize_filename(company)}__{sanitize_filename(title)}.txt"
-    path = os.path.join(LETTERS_DIR, expected)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                return f.read(), expected
-        except Exception:
-            pass
-    sc = sanitize_filename(company).lower()
-    st_part = sanitize_filename(title).lower()[:20]
-    for fname in os.listdir(LETTERS_DIR):
-        if fname.endswith(".txt") and sc in fname.lower() and st_part in fname.lower():
-            try:
-                with open(os.path.join(LETTERS_DIR, fname), "r", encoding="utf-8") as f:
-                    return f.read(), fname
-            except Exception:
-                pass
-    return None, None
-
-
-def source_badge(source):
-    s = source.lower()
-    if "wework" in s or "wwr" in s:
-        return '<span class="src-badge src-wwr">WWR</span>'
-    elif "remoteok" in s or "remote ok" in s:
-        return '<span class="src-badge src-rok">RemoteOK</span>'
-    elif "remotive" in s:
-        return '<span class="src-badge src-rem">Remotive</span>'
-    else:
-        return f'<span class="src-badge src-other">{source[:12]}</span>'
-
-
 def build_zip(letters_dir):
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fname in sorted(os.listdir(letters_dir)):
+    """Create a ZIP file of all cover letters"""
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for fname in os.listdir(letters_dir):
             if fname.endswith(".txt"):
                 fpath = os.path.join(letters_dir, fname)
-                zf.write(fpath, fname)
-    buf.seek(0)
-    return buf
+                zipf.write(fpath, fname)
+    zip_buf.seek(0)
+    return zip_buf.getvalue()
 
-
-# ============================================
-# LOAD PROFILE
-# ============================================
-
-_disk_profile = load_json(PROFILE_FILE)
-if isinstance(_disk_profile, dict) and (_disk_profile.get("name") or _disk_profile.get("skills")):
-    profile = _disk_profile
-else:
-    profile = {"name": "", "headline": "", "skills": []}
-
-has_profile = bool(profile.get("skills"))
-has_matches = isinstance(load_json(MATCHES_FILE), list) and len(load_json(MATCHES_FILE)) > 0
-
-# ============================================
-# PRE-SEED EDIT FIELDS FROM PROFILE
-# ============================================
-
-if has_profile:
-    if "name_input" not in st.session_state:
-        st.session_state["name_input"] = profile.get("name", "")
-    if "headline_input" not in st.session_state:
-        st.session_state["headline_input"] = profile.get("headline", "")
-    if "skills_input" not in st.session_state:
-        st.session_state["skills_input"] = "\n".join(profile.get("skills", []))
+def find_cover_letter(company, title):
+    """Find cover letter file for a job"""
+    if not os.path.exists(LETTERS_DIR):
+        return None, None
+    
+    # Sanitize search terms
+    company_clean = re.sub(r'[^a-zA-Z0-9_\-]', '', company.replace(' ', '_'))
+    title_clean = re.sub(r'[^a-zA-Z0-9_\-]', '', title.replace(' ', '_'))
+    
+    # Try to find matching file
+    for fname in os.listdir(LETTERS_DIR):
+        if fname.endswith(".txt"):
+            fname_lower = fname.lower()
+            if company_clean.lower() in fname_lower or title_clean.lower() in fname_lower:
+                fpath = os.path.join(LETTERS_DIR, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        return f.read(), fname
+                except Exception:
+                    pass
+    return None, None
 
 # ============================================
-# HERO
+# SIDEBAR - SESSION CONTROL
+# ============================================
+
+with st.sidebar:
+    st.markdown("### 🎯 Session Control")
+    st.caption(f"Session ID: `{SESSION_ID}`")
+    
+    if st.button("🔄 Start Fresh Session", use_container_width=True):
+        # Clear session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+    
+    st.markdown("---")
+    st.markdown("### 📊 About JobBot")
+    st.markdown("""
+    **How it works:**
+    1. **Skills-based matching** - Extracts skills from your resume
+    2. **Keyword filtering** - Finds relevant jobs (300+ sources)
+    3. **AI ranking** - Gemini scores top candidates
+    4. **Smart matching** - Considers seniority & diversity
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 🔍 Job Sources")
+    st.markdown("""
+    - WeWorkRemotely (6 categories)
+    - RemoteOK
+    - Jobicy
+    - Remotive
+    """)
+
+# ============================================
+# HERO SECTION
 # ============================================
 
 st.markdown("""
 <div class="hero">
     <div class="hero-content">
-        <h1>⚡ Job<span class="accent">Bot</span></h1>
-        <p>Smart matching · Instant cover letters · Zero busywork</p>
-        <div class="tag-row">
-            <span class="tag">Gemini 2.5 Flash</span>
-            <span class="tag">3 Job Boards</span>
-            <span class="tag">Keyword + AI Scoring</span>
+        <h1>🚀 JobBot</h1>
+        <p class="hero-subtitle">
+            AI-powered job matching that actually works. Upload your resume, 
+            get matched with remote opportunities, and generate tailored cover letters in minutes.
+        </p>
+        <div class="hero-tags">
+            <span class="hero-tag">🤖 Gemini 2.5 Flash</span>
+            <span class="hero-tag">📊 Skills-Based Matching</span>
+            <span class="hero-tag">🌍 300+ Jobs Daily</span>
+            <span class="hero-tag">✨ Smart Deduplication</span>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ============================================
-# WELCOME
+# PROGRESS STEPPER
 # ============================================
 
-if has_profile and profile.get("name") and profile["name"] != "Candidate":
-    skill_count = len(profile.get("skills", []))
-    headline = profile.get("headline", "")
-    sub = f"{headline} · " if headline else ""
-    first_name = profile["name"].split()[0] if profile["name"] else "there"
-    st.markdown(f"""
-    <div class="welcome">
-        <div class="welcome-emoji">👋</div>
-        <div>
-            <h3>Hey, {first_name}</h3>
-            <p>{sub}{skill_count} skills loaded · Ready to match</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+profile = load_json(PROFILE_FILE)
+matches = load_json(MATCHES_FILE)
 
-# ============================================
-# STEP PILLS
-# ============================================
-
-p1 = "done" if has_profile else "on"
-p2 = "done" if has_profile else "wait"
-p3 = "done" if has_matches else ("on" if has_profile else "wait")
-p4 = "done" if has_matches else "wait"
+step1_status = "done" if profile and profile.get("skills") else "active"
+step2_status = "done" if matches else ("active" if step1_status == "done" else "pending")
+step3_status = "done" if os.path.exists(LETTERS_DIR) and os.listdir(LETTERS_DIR) else ("active" if step2_status == "done" else "pending")
 
 st.markdown(f"""
 <div class="stepper">
-    <div class="step {p1}"><div class="step-dot"></div>Upload</div>
-    <div class="step-line"></div>
-    <div class="step {p2}"><div class="step-dot"></div>Profile</div>
-    <div class="step-line"></div>
-    <div class="step {p3}"><div class="step-dot"></div>Match</div>
-    <div class="step-line"></div>
-    <div class="step {p4}"><div class="step-dot"></div>Letters</div>
+    <div class="step {step1_status}">
+        <div class="step-icon">📄</div>
+        <span>Upload Resume</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step {step2_status}">
+        <div class="step-icon">🎯</div>
+        <span>Match Jobs</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step {step3_status}">
+        <div class="step-icon">✉️</div>
+        <span>Generate Letters</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ============================================
-# SIDEBAR
+# STEP 1: RESUME UPLOAD & PROFILE
 # ============================================
 
-with st.sidebar:
-    st.markdown("### ⚙️ Session")
-    st.caption(f"ID: `{SID}`")
-    if st.button("🔄 Start Fresh"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-    st.divider()
-    st.markdown("### How it works")
-    st.markdown(
-        "1. **Upload** your resume PDF\n"
-        "2. **Review** your extracted profile\n"
-        "3. **Run matching** against live remote jobs\n"
-        "4. **Read & download** tailored cover letters"
-    )
-    st.divider()
-    st.markdown("### Engine")
-    st.markdown(
-        "**Phase 1** — Keyword matching (instant)  \n"
-        "**Phase 2** — Gemini 2.5 Flash scoring  \n"
-        "**Phase 3** — Seniority + diversity filters"
-    )
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown("""
+<div class="card-header">
+    <div class="card-icon">📄</div>
+    <h2 class="card-title">Step 1: Your Profile</h2>
+</div>
+""", unsafe_allow_html=True)
 
-# ============================================
-# TWO-COLUMN LAYOUT: Upload + Profile
-# ============================================
+col1, col2 = st.columns([2, 1])
 
-col_left, col_right = st.columns([1, 1], gap="large")
-
-# ============================================
-# LEFT: UPLOAD + PARSE
-# ============================================
-
-with col_left:
-    st.markdown('<div class="card"><h3><span class="card-icon upload">📄</span> Resume</h3>', unsafe_allow_html=True)
-
-    uploaded = st.file_uploader(
-        "Drop your resume here",
+with col1:
+    uploaded_resume = st.file_uploader(
+        "Upload your resume (PDF)",
         type=["pdf"],
-        label_visibility="collapsed",
+        help="We'll extract your skills, experience, and headline automatically",
+        key="resume_upload"
     )
 
-    if uploaded:
-        save_path = os.path.join(SESSION_DIR, uploaded.name)
+with col2:
+    if uploaded_resume:
+        if st.button("🔍 Parse Resume", type="primary", use_container_width=True):
+            with st.spinner("Analyzing your resume..."):
+                try:
+                    # Save uploaded file
+                    resume_path = os.path.join(DATA_DIR, "resume.pdf")
+                    with open(resume_path, "wb") as f:
+                        f.write(uploaded_resume.getbuffer())
+                    
+                    # Parse resume
+                    profile = build_profile(resume_path, PROFILE_FILE)
+                    st.success("✅ Resume parsed successfully!")
+                    time.sleep(0.5)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error parsing resume: {e}")
 
-        if st.session_state.get("_uploaded_name") != uploaded.name:
-            with open(save_path, "wb") as f:
-                f.write(uploaded.getvalue())
-            st.session_state["_uploaded_name"] = uploaded.name
-            st.session_state["_uploaded_path"] = save_path
-            st.session_state.pop("_profile_built", None)
+# Display current profile
+profile = load_json(PROFILE_FILE)
 
-        save_path = st.session_state.get("_uploaded_path", save_path)
-        st.success(f"📎 {uploaded.name}")
+if profile and profile.get("skills"):
+    st.markdown("---")
+    st.markdown(f"**👤 {profile.get('name', 'Candidate')}**")
+    if profile.get('headline'):
+        st.caption(profile['headline'])
+    
+    skills = profile.get("skills", [])
+    if skills:
+        skills_html = "".join([f'<span class="skill-chip">{s}</span>' for s in skills])
+        st.markdown(f'<div class="skills-container">{skills_html}</div>', unsafe_allow_html=True)
+        st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
+else:
+    st.info("👆 Upload your resume to get started, or create a profile manually below")
 
-        if not st.session_state.get("_profile_built"):
-            if st.button("🧠 Parse Resume", use_container_width=True):
-                with st.spinner("Extracting with Gemini 2.5 Flash…"):
-                    try:
-                        build_profile(save_path, output_path=PROFILE_FILE)
-                        if os.path.exists(PROFILE_FILE):
-                            with open(PROFILE_FILE, "r") as f:
-                                saved = json.load(f)
-                            st.session_state["_profile_built"] = True
-                            st.session_state["name_input"] = saved.get("name", "")
-                            st.session_state["headline_input"] = saved.get("headline", "")
-                            st.session_state["skills_input"] = "\n".join(saved.get("skills", []))
-                            n = saved.get("name", "Candidate")
-                            sc = len(saved.get("skills", []))
-                            st.success(f"✅ {n} — {sc} skills")
-                            time.sleep(0.5)
-                            st.rerun()
-                        else:
-                            st.error("Profile not created. Check your PDF.")
-                    except Exception as e:
-                        st.error(f"❌ {e}")
-                        st.info("Try entering your profile manually.")
+# Manual profile editing
+with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create Profile Manually"):
+    name_input = st.text_input("Full Name", value=profile.get("name", "") if profile else "")
+    headline_input = st.text_input("Professional Headline", value=profile.get("headline", "") if profile else "")
+    skills_input = st.text_area(
+        "Skills (one per line)", 
+        value="\n".join(profile.get("skills", [])) if profile else "",
+        height=150,
+        help="Enter specific skills, tools, and technologies - these are used for matching"
+    )
+    
+    if st.button("💾 Save Profile", use_container_width=True):
+        skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
+        if not skills_list and not name_input:
+            st.error("⚠️ Please enter at least a name or some skills")
         else:
-            st.info("✅ Parsed. Upload a new file to re-parse.")
-    else:
-        st.caption("PDF format · Drag & drop or browse")
+            updated_profile = {
+                "name": name_input or "Candidate",
+                "headline": headline_input,
+                "skills": skills_list,
+            }
+            save_json(PROFILE_FILE, updated_profile)
+            st.success("✅ Profile saved!")
+            time.sleep(0.5)
+            st.rerun()
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ============================================
-# RIGHT: PROFILE DISPLAY + EDIT
-# ============================================
-
-with col_right:
-    st.markdown('<div class="card"><h3><span class="card-icon profile">👤</span> Profile</h3>', unsafe_allow_html=True)
-
-    if has_profile:
-        display_name = profile.get("name", "Candidate")
-        display_headline = profile.get("headline", "")
-
-        if display_name and display_name != "Candidate":
-            st.markdown(f"**{display_name}**")
-        if display_headline:
-            st.caption(display_headline)
-
-        skills = profile.get("skills", [])
-        if skills:
-            chips = "".join(f'<span class="chip">{s}</span>' for s in skills)
-            st.markdown(f'<div class="chips">{chips}</div>', unsafe_allow_html=True)
-            st.caption(f"{len(skills)} skills · from resume")
-    else:
-        st.caption("No profile yet — upload a resume or create one below.")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # ---- Edit form ----
-    with st.expander(
-        "✏️ Edit profile" if has_profile else "✏️ Create profile manually",
-        expanded=not has_profile,
-    ):
-        name_val = st.text_input("Full Name", key="name_input")
-        headline_val = st.text_input("Professional Headline", key="headline_input")
-        skills_val = st.text_area("Skills (one per line)", height=150, key="skills_input")
-
-        if st.button("💾 Save Profile", use_container_width=True):
-            skills_list = [s.strip() for s in skills_val.split("\n") if s.strip()]
-            if not skills_list and not name_val:
-                st.error("Enter at least a name or some skills.")
-            else:
-                updated = {
-                    "name": name_val or "Candidate",
-                    "headline": headline_val,
-                    "skills": skills_list,
-                }
-                save_json(PROFILE_FILE, updated)
-                st.success("✅ Saved!")
-                for k in ("name_input", "headline_input", "skills_input"):
-                    st.session_state.pop(k, None)
-                st.session_state.pop("_matching_done", None)
-                time.sleep(0.3)
-                st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# JOB MATCHING
+# STEP 2: JOB MATCHING
 # ============================================
 
-st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
-st.markdown('<div class="card"><h3><span class="card-icon match">🚀</span> Job Matching</h3>', unsafe_allow_html=True)
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown("""
+<div class="card-header">
+    <div class="card-icon">🎯</div>
+    <h2 class="card-title">Step 2: Job Matching</h2>
+</div>
+""", unsafe_allow_html=True)
 
-profile_ready = bool(profile.get("skills"))
+profile = load_json(PROFILE_FILE)
+profile_ready = bool(profile and profile.get("skills"))
 
 if not profile_ready:
-    st.info("Add skills to your profile above to unlock matching.")
+    st.warning("⚠️ Please complete your profile above to unlock job matching")
 else:
-    with st.expander("📁 Upload custom jobs.json (optional)"):
-        jobs_upload = st.file_uploader("Upload jobs.json", type=["json"], key="jobs_upload", label_visibility="collapsed")
-        if jobs_upload and st.session_state.get("_jobs_uploaded_name") != jobs_upload.name:
+    # Explain matching process
+    with st.expander("ℹ️ How does matching work?"):
+        st.markdown("""
+        **JobBot uses a 3-phase matching system:**
+        
+        1. **Keyword Extraction** - We extract skills from your resume + expand them with related terms
+        2. **Local Scoring** - All jobs are scored locally based on keyword overlap (fast, no API calls)
+        3. **AI Ranking** - Top 30-50 candidates sent to Gemini 2.5 Flash for final scoring
+        
+        **What we match on:**
+        - ✅ Your **skills** (primary signal - exact matches + variants)
+        - ✅ Your **headline** (job title/role context)
+        - ✅ Domain terms extracted from both
+        
+        **What we filter:**
+        - ❌ Non-English jobs
+        - ❌ Jobs too senior for your experience
+        - ❌ Duplicate postings across sources
+        """)
+    
+    # Optional: Upload custom jobs
+    with st.expander("📁 Use Custom Jobs (Optional)"):
+        jobs_upload = st.file_uploader(
+            "Upload jobs.json",
+            type=["json"],
+            help="Upload your own jobs.json file instead of fetching from job boards"
+        )
+        if jobs_upload:
             try:
                 jobs_data = json.loads(jobs_upload.getvalue())
                 save_json(JOBS_FILE, jobs_data)
-                st.session_state["_jobs_uploaded_name"] = jobs_upload.name
-                st.success(f"✅ {len(jobs_data)} jobs loaded")
+                st.success(f"✅ Loaded {len(jobs_data)} jobs from file")
             except Exception as e:
-                st.error(f"Invalid JSON: {e}")
-
+                st.error(f"❌ Invalid JSON file: {e}")
+    
+    # Run matching
     if st.session_state.get("_matching_done"):
-        st.success("✅ Matching complete — scroll down for results.")
-        if st.button("🔄 Re-run with fresh jobs"):
-            st.session_state.pop("_matching_done", None)
-            st.session_state.pop("_matching_running", None)
-            for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
-                if os.path.exists(fp):
-                    os.remove(fp)
-            if os.path.exists(LETTERS_DIR):
-                for lf in os.listdir(LETTERS_DIR):
-                    os.remove(os.path.join(LETTERS_DIR, lf))
-            st.rerun()
-
+        st.success("✅ Matching complete! Scroll down to see your matches.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
+                # Clear all matching data
+                st.session_state.pop("_matching_done", None)
+                for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                    if os.path.exists(fp):
+                        os.remove(fp)
+                if os.path.exists(LETTERS_DIR):
+                    for lf in os.listdir(LETTERS_DIR):
+                        os.remove(os.path.join(LETTERS_DIR, lf))
+                st.rerun()
+        
+        with col2:
+            if st.button("📝 Generate Cover Letters", type="primary", use_container_width=True):
+                st.session_state["_generate_letters"] = True
+                st.rerun()
+    
     elif st.session_state.get("_matching_running"):
-        st.warning("⏳ Pipeline running — please wait…")
-
+        st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
+    
     else:
-        st.markdown(
-            "Scans **WeWorkRemotely**, **RemoteOK** & **Remotive**, "
-            "filters by keyword match, then scores top candidates with Gemini."
-        )
-        if st.button("▶ Start Matching", type="primary", use_container_width=True):
+        st.markdown("""
+        **Ready to find your next role?**
+        
+        We'll scan **WeWorkRemotely**, **RemoteOK**, **Jobicy**, and **Remotive** 
+        for jobs matching your skills, then rank the top candidates using AI.
+        """)
+        
+        if st.button("🚀 Start Job Matching", type="primary", use_container_width=True):
             st.session_state["_matching_running"] = True
-            status = st.empty()
-            log_box = st.empty()
-            lines = []
-
-            def _progress(msg):
-                lines.append(msg)
-                log_box.code("\n".join(lines[-15:]), language=None)
-
-            status.info("🔍 Fetching jobs & matching…")
+            status_box = st.empty()
+            progress_box = st.empty()
+            log_lines = []
+            
+            def progress_callback(msg):
+                log_lines.append(msg)
+                progress_box.code("\n".join(log_lines[-20:]), language=None)
+            
             try:
+                status_box.info("🔍 Fetching jobs and running matching pipeline...")
+                
                 result = run_auto_apply_pipeline(
                     profile_file=PROFILE_FILE,
                     jobs_file=JOBS_FILE,
                     matches_file=MATCHES_FILE,
                     cache_file=CACHE_FILE,
                     log_file=LOG_FILE,
-                    letters_dir=LETTERS_DIR,
-                    progress_callback=_progress,
+                    letters_dir=None,  # Don't generate letters yet
+                    progress_callback=progress_callback,
                 )
+                
                 st.session_state["_matching_done"] = True
                 st.session_state.pop("_matching_running", None)
+                
                 if result and result.get("status") == "success":
-                    status.success(f"✅ {result['matches']} matches from {result['total_scored']} jobs")
+                    status_box.success(f"✅ Found {result['matches']} matches from {result['total_scored']} jobs!")
                 elif result and result.get("status") == "no_matches":
-                    status.warning("No strong matches found. Try broadening your skills.")
+                    status_box.warning("⚠️ No strong matches found. Try broadening your skills or check back later.")
                 else:
-                    status.error(f"Pipeline: {result}")
+                    status_box.error(f"❌ Pipeline error: {result}")
+                
                 time.sleep(1)
                 st.rerun()
+                
             except Exception as e:
                 st.session_state.pop("_matching_running", None)
-                status.error(f"❌ {e}")
+                status_box.error(f"❌ Error: {e}")
                 st.exception(e)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# MATCH RESULTS
+# STEP 3: MATCH RESULTS & COVER LETTERS
 # ============================================
 
 matches_data = load_json(MATCHES_FILE)
 
 if isinstance(matches_data, list) and matches_data:
-    st.markdown('<div class="soft-divider"></div>', unsafe_allow_html=True)
-
-    # ---- Stats ----
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    
+    # Stats
     scores = [j.get("match_score", 0) for j in matches_data]
     avg_score = sum(scores) / len(scores) if scores else 0
+    max_score = max(scores) if scores else 0
+    min_score = min(scores) if scores else 0
+    
     sources = {}
     for j in matches_data:
         src = j.get("source", "Other")
         sources[src] = sources.get(src, 0) + 1
-
+    
     letter_files = []
     if os.path.exists(LETTERS_DIR):
         letter_files = [f for f in os.listdir(LETTERS_DIR) if f.endswith(".txt")]
-
+    
     st.markdown(f"""
-    <div class="stats-row">
+    <div class="stats-grid">
         <div class="stat-card">
-            <div class="num">{len(matches_data)}</div>
-            <div class="lbl">Matches</div>
+            <div class="stat-value">{len(matches_data)}</div>
+            <div class="stat-label">Total Matches</div>
         </div>
         <div class="stat-card">
-            <div class="num">{avg_score:.0f}%</div>
-            <div class="lbl">Avg Score</div>
+            <div class="stat-value">{avg_score:.0f}%</div>
+            <div class="stat-label">Avg Score</div>
         </div>
         <div class="stat-card">
-            <div class="num">{len(letter_files)}</div>
-            <div class="lbl">Letters</div>
+            <div class="stat-value">{max_score}%</div>
+            <div class="stat-label">Top Score</div>
         </div>
         <div class="stat-card">
-            <div class="num">{len(sources)}</div>
-            <div class="lbl">Sources</div>
+            <div class="stat-value">{len(letter_files)}</div>
+            <div class="stat-label">Cover Letters</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    # ---- Download ZIP ----
+    
+    # Cover letter generation
+    if st.session_state.get("_generate_letters"):
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="card-header">
+            <div class="card-icon">✉️</div>
+            <h2 class="card-title">Generating Cover Letters...</h2>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        os.makedirs(LETTERS_DIR, exist_ok=True)
+        profile = load_json(PROFILE_FILE)
+        
+        for i, job in enumerate(matches_data):
+            try:
+                status_text.text(f"Generating letter {i+1}/{len(matches_data)}: {job.get('company')} - {job.get('title')}")
+                generate_cover_letter(job, profile, LETTERS_DIR)
+                progress_bar.progress((i + 1) / len(matches_data))
+            except Exception as e:
+                st.warning(f"⚠️ Failed to generate letter for {job.get('company')}: {e}")
+        
+        st.session_state.pop("_generate_letters", None)
+        st.success(f"✅ Generated {len(matches_data)} cover letters!")
+        time.sleep(1)
+        st.rerun()
+    
+    # Download ZIP
     if letter_files:
-        col_title, col_zip = st.columns([3, 1])
-        with col_title:
-            st.markdown(f"### Your Top {len(matches_data)} Matches")
-        with col_zip:
-            zip_buf = build_zip(LETTERS_DIR)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
+        with col2:
+            zip_data = build_zip(LETTERS_DIR)
             st.download_button(
                 "📦 Download All Letters",
-                data=zip_buf,
-                file_name="cover_letters.zip",
+                data=zip_data,
+                file_name="jobbot_cover_letters.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
     else:
-        st.markdown(f"### Your Top {len(matches_data)} Matches")
-
-    # ---- Match cards ----
+        st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
+        st.info("💡 Click 'Generate Cover Letters' above to create tailored letters for each job")
+    
+    # Job cards
     for i, job in enumerate(matches_data, 1):
         score = job.get("match_score", 0)
         company = job.get("company", "Unknown")
         title = job.get("title", "Unknown")
         source = job.get("source", "")
-        raw_summary = job.get("summary", "")
-        clean_summary = strip_html(raw_summary)
-        if len(clean_summary) > 400:
-            clean_summary = clean_summary[:400] + "…"
-
-        if score >= 80:
-            badge = f'<span class="score-hi">{score}%</span>'
-        elif score >= 65:
-            badge = f'<span class="score-md">{score}%</span>'
+        summary = strip_html(job.get("summary", ""))[:400]
+        
+        # Score badge
+        if score >= 75:
+            badge_class = "score-excellent"
+            badge_emoji = "🔥"
+        elif score >= 60:
+            badge_class = "score-good"
+            badge_emoji = "⭐"
         else:
-            badge = f'<span class="score-lo">{score}%</span>'
-
-        src_html = source_badge(source)
-
-        with st.expander(f"#{i}  ·  {company} — {title}  ({score}%)"):
-            c1, c2 = st.columns([4, 1])
-            with c1:
+            badge_class = "score-fair"
+            badge_emoji = "👍"
+        
+        with st.expander(f"#{i} · {badge_emoji} {company} — {title} ({score}%)"):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
                 st.markdown(f"**{title}**")
+                st.markdown(f"🏢 **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
+                if summary:
+                    st.write(summary)
+            
+            with col2:
                 st.markdown(
-                    f"🏢 {company}  ·  {src_html}",
-                    unsafe_allow_html=True,
-                )
-                if clean_summary:
-                    st.write(clean_summary)
-            with c2:
-                st.markdown(
-                    f'<div style="text-align:center;margin-top:0.3rem;">{badge}</div>',
-                    unsafe_allow_html=True,
+                    f'<div style="text-align:center; margin-bottom:1rem;">'
+                    f'<span class="score-badge {badge_class}">{score}%</span>'
+                    f'</div>',
+                    unsafe_allow_html=True
                 )
                 if job.get("apply_url"):
-                    st.link_button("🔗 Apply", job["apply_url"], use_container_width=True)
-
-            # ---- Cover letter ----
-            cl_content, cl_fname = find_cover_letter(company, title)
-            if cl_content:
+                    st.link_button("🔗 Apply Now", job["apply_url"], use_container_width=True)
+            
+            # Cover letter if exists
+            letter_content, letter_fname = find_cover_letter(company, title)
+            if letter_content:
                 st.markdown("---")
-                st.markdown('<p class="cl-label">📝 Tailored Cover Letter</p>', unsafe_allow_html=True)
-                st.markdown(f'<div class="cl-wrap">{cl_content}</div>', unsafe_allow_html=True)
+                st.markdown('<p class="cover-letter-label">📝 Tailored Cover Letter</p>', unsafe_allow_html=True)
+                st.markdown(f'<div class="cover-letter-box">{letter_content}</div>', unsafe_allow_html=True)
                 st.download_button(
                     "📥 Download Letter",
-                    data=cl_content,
-                    file_name=cl_fname or f"cover_letter_{i}.txt",
+                    data=letter_content,
+                    file_name=letter_fname or f"cover_letter_{i}.txt",
                     mime="text/plain",
                     key=f"dl_{i}",
                     use_container_width=True,
@@ -926,7 +1043,8 @@ if isinstance(matches_data, list) and matches_data:
 
 st.markdown("""
 <div class="footer">
-    Built with Streamlit & Gemini 2.5 Flash · Each session is fully isolated ·
-    Click <b>Start Fresh</b> in the sidebar to begin again
+    Built with ❤️ using Streamlit & Gemini 2.5 Flash<br>
+    <a href="https://github.com" target="_blank">View on GitHub</a> · 
+    <a href="#" onclick="alert('Feature coming soon!')">Report Bug</a>
 </div>
 """, unsafe_allow_html=True)

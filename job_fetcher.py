@@ -54,14 +54,23 @@ def extract_company_from_title(title: str) -> tuple:
             return (parts[0].strip(), parts[1].strip())
     return ("", title)
 
+# ============================================
+# JOB SOURCES CONFIGURATION
+# ============================================
+
 WWR_FEEDS = [
     "https://weworkremotely.com/categories/remote-programming-jobs.rss",
     "https://weworkremotely.com/categories/remote-design-jobs.rss",
     "https://weworkremotely.com/categories/remote-marketing-jobs.rss",
     "https://weworkremotely.com/categories/remote-customer-support-jobs.rss",
+    "https://weworkremotely.com/categories/remote-product-jobs.rss",
+    "https://weworkremotely.com/categories/remote-sales-jobs.rss",
 ]
 
 REMOTEOK = "https://remoteok.com/remote-jobs.rss"
+
+# Jobicy - High quality remote jobs RSS feed
+JOBICY = "https://jobicy.com/feed/"
 
 # ============================================
 # RSS PARSING WITH ERROR HANDLING
@@ -85,7 +94,7 @@ def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries
                 url,
                 timeout=timeout,
                 headers={
-                    'User-Agent': 'JobBot/1.0 (Job Aggregator)',
+                    'User-Agent': 'JobBot/2.0 (Job Aggregator; +https://github.com/jobbot)',
                     'Accept': 'application/rss+xml, application/xml, text/xml'
                 }
             )
@@ -185,7 +194,7 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
             url,
             timeout=timeout,
             headers={
-                'User-Agent': 'JobBot/1.0 (Job Aggregator)',
+                'User-Agent': 'JobBot/2.0 (Job Aggregator; +https://github.com/jobbot)',
                 'Accept': 'application/json'
             }
         )
@@ -286,6 +295,13 @@ def fetch_all(output_path: str = None) -> list:
     except Exception as e:
         logger.error(f"Failed to fetch RemoteOK: {e}")
     
+    # Fetch from Jobicy
+    try:
+        jobs = parse_rss(JOBICY, "Jobicy")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Failed to fetch Jobicy: {e}")
+    
     # Fetch from Remotive API
     try:
         jobs = fetch_remotive_jobs()
@@ -303,12 +319,26 @@ def fetch_all(output_path: str = None) -> list:
     
     logger.info(f"Total jobs fetched: {len(all_jobs)}")
     
+    # Deduplicate jobs based on URL (some jobs may appear on multiple boards)
+    seen_urls = set()
+    unique_jobs = []
+    for job in all_jobs:
+        url = job.get("apply_url", "")
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            unique_jobs.append(job)
+        elif not url:
+            # Keep jobs without URLs (shouldn't happen but be defensive)
+            unique_jobs.append(job)
+    
+    logger.info(f"Unique jobs after deduplication: {len(unique_jobs)} (removed {len(all_jobs) - len(unique_jobs)} duplicates)")
+    
     # Save to file
     try:
         os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
         
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(all_jobs, f, indent=2, ensure_ascii=False)
+            json.dump(unique_jobs, f, indent=2, ensure_ascii=False)
         
         logger.info(f"Jobs saved to {output_path}")
     
@@ -316,7 +346,7 @@ def fetch_all(output_path: str = None) -> list:
         logger.error(f"Failed to save jobs file: {e}")
         raise
     
-    return all_jobs
+    return unique_jobs
 
 
 # ============================================
@@ -332,7 +362,7 @@ if __name__ == "__main__":
         
         jobs = fetch_all(output_path=output)
         
-        print(f"\n✅ Successfully fetched {len(jobs)} jobs!")
+        print(f"\n✅ Successfully fetched {len(jobs)} unique jobs!")
         print(f"Saved to: {output}")
         
         # Show breakdown by source
