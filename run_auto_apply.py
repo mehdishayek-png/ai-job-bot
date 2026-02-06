@@ -453,7 +453,23 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         "ireland": ["ireland", "dublin"],
     }
     country_aliases = COUNTRY_ALIASES.get(user_country_lc, [user_country_lc] if user_country_lc else [])
-    logger.info(f"User country: {user_country} (aliases: {country_aliases[:3]}...)")
+    
+    # Also add state/city to aliases for finer location matching
+    user_state = (profile.get("state", "") or "").strip()
+    if user_state and user_state != "Any":
+        import re as _re
+        city_match = _re.search(r'\(([^)]+)\)', user_state)
+        if city_match:
+            for city in city_match.group(1).split("/"):
+                city = city.strip().lower()
+                if city and city not in country_aliases:
+                    country_aliases.append(city)
+        else:
+            state_lc = user_state.lower()
+            if state_lc not in country_aliases:
+                country_aliases.append(state_lc)
+    
+    logger.info(f"User country: {user_country}, state: {user_state} (aliases: {country_aliases[:5]}...)")
 
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
@@ -621,7 +637,14 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             local_score = job.get("_local_score", 0)
             combined = int(local_score * 0.4 + llm_score * 0.6)
 
-            # Location boost: +8 if job mentions user's country
+            # Source priority boost: jobs from local job boards get +5
+            # These are more likely to be relevant, recently posted, and actually hiring
+            source = job.get("source", "").lower()
+            PRIORITY_SOURCES = {"google jobs", "indeed", "naukri", "linkedin", "instahyre", "foundit", "glassdoor"}
+            if source in PRIORITY_SOURCES:
+                combined = min(combined + 5, 100)
+
+            # Location boost: +8 if job mentions user's country or state/city
             if user_country_lc and user_country_lc != "remote only":
                 job_text = f"{job.get('title','')} {job.get('summary','')} {job.get('source','')}".lower()
                 if user_country_lc in job_text or any(alias in job_text for alias in country_aliases):
