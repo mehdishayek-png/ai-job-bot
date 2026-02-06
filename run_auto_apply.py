@@ -49,7 +49,7 @@ client = OpenAI(
 
 MODEL = os.getenv("SCORING_MODEL", "mistralai/mistral-7b-instruct")
 MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "70"))
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "15"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))  # seconds between calls
 
 # ============================================
@@ -136,25 +136,123 @@ def deduplicate_jobs(jobs: list) -> list:
     return unique
 
 # ============================================
+# SENIORITY DETECTION
+# ============================================
+
+SENIOR_TITLE_WORDS = [
+    "lead", "head of", "head,", "director", "vp ", "vice president",
+    "principal", "chief", "cto", "coo", "ceo", "cfo",
+    "founding", "co-founder", "partner", "svp", "evp",
+    "staff ", "distinguished",
+]
+
+MID_TITLE_WORDS = [
+    "senior", "sr ", "sr.", "manager", "team lead",
+]
+
+
+def detect_seniority(title: str) -> str:
+    """Classify job title seniority: 'senior', 'mid', or 'open'."""
+    t = title.lower()
+    if any(w in t for w in SENIOR_TITLE_WORDS):
+        return "senior"
+    if any(w in t for w in MID_TITLE_WORDS):
+        return "mid"
+    return "open"
+
+
+def estimate_candidate_years(profile: dict) -> int:
+    """Estimate experience from profile headline/skills."""
+    headline = (profile.get("headline", "") or "").lower()
+
+    # Look for explicit mention
+    import re as _re
+    m = _re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
+    if m:
+        return int(m.group(1))
+
+    # Infer from title words
+    if any(w in headline for w in ["intern", "trainee", "fresher", "entry"]):
+        return 0
+    if any(w in headline for w in ["junior", "associate", "jr "]):
+        return 1
+    if any(w in headline for w in ["specialist", "analyst", "coordinator", "executive"]):
+        return 2
+    if any(w in headline for w in ["senior", "sr ", "lead", "manager"]):
+        return 5
+    if any(w in headline for w in ["director", "head of", "vp "]):
+        return 10
+
+    return 2  # Conservative default
+
+
+# ============================================
+# LOCATION CLASSIFICATION
+# ============================================
+
+INDIA_SIGNALS = [
+    "india", "bangalore", "bengaluru", "mumbai", "delhi",
+    "hyderabad", "pune", "chennai", "kolkata", "gurgaon",
+    "gurugram", "noida", "jaipur", "ahmedabad", "kochi",
+    "chandigarh", "indore", "lucknow", "coimbatore",
+]
+
+REMOTE_SIGNALS = [
+    "remote", "work from home", "wfh", "anywhere",
+    "distributed", "fully remote", "remote-first",
+]
+
+
+def classify_location(job: dict) -> str:
+    """Classify job as 'india', 'remote', or 'other'."""
+    loc = (job.get("location", "") or "").lower()
+    title = job.get("title", "").lower()
+    summary = (job.get("summary", "") or "")[:500].lower()
+    combined = f"{loc} {title} {summary}"
+
+    if any(s in combined for s in INDIA_SIGNALS):
+        return "india"
+    if any(s in combined for s in REMOTE_SIGNALS):
+        return "remote"
+    return "other"
+
+
+# ============================================
 # SEMANTIC SCORING WITH RETRY & RATE LIMITING
 # ============================================
 
-def semantic_score(job: dict, profile_text: str, max_retries: int = 3) -> int:
+def semantic_score(job: dict, profile_text: str, candidate_years: int = 2, max_retries: int = 3) -> int:
     """
     Score match between candidate and job with retry logic and rate limiting.
+    Now includes seniority awareness in the prompt.
     """
     # Truncate long job descriptions
     summary = job.get("summary", "")[:2000]
-    
-    prompt = f"""
-Score match between candidate and job from 0-100.
+    title = job.get("title", "Unknown")
+    location = classify_location(job)
+
+    prompt = f"""Score match between candidate and job from 0-100. Be strict.
 
 Candidate:
 {profile_text}
+Experience: approximately {candidate_years} years
 
-Job Title: {job.get("title", "Unknown")}
+Job Title: {title}
+Job Location: {location}
 Job Description:
 {summary}
+
+CRITICAL SCORING RULES:
+- If the job title contains "Lead", "Director", "VP", "Head of", "Principal", "Staff"
+  and the candidate has less than 5 years experience, score 30-50 MAX.
+- If the job title contains "Senior" or "Manager" and the candidate has less than
+  3 years experience, score 45-60 MAX.
+- Seniority mismatch OVERRIDES skill overlap. Wrong level = low score.
+- "Specialist", "Associate", "Coordinator", "Executive" roles fit 1-4 years well.
+- Strategy/GTM/Revenue Operations Lead roles require 7-10+ years.
+
+LOCATION BONUS:
+- If location is "india" or "remote", add +5 to the score.
 
 Return ONLY a number between 0 and 100.
 """
@@ -250,6 +348,40 @@ def run_pipeline(
     # ---- Deduplicate jobs ----
     jobs = deduplicate_jobs(jobs)
 
+    # ---- Estimate candidate experience ----
+    candidate_years = estimate_candidate_years(profile)
+    logger.info(f"Estimated experience: ~{candidate_years} years")
+    if progress_callback:
+        progress_callback(f"Estimated experience: ~{candidate_years} years")
+
+    # ---- Pre-filter: seniority + location ----
+    filtered_jobs = []
+    stats = {"too_senior": 0, "wrong_location": 0, "passed": 0}
+
+    for job in jobs:
+        title = job.get("title", "")
+        loc = classify_location(job)
+
+        # Kill senior roles for junior candidates
+        if candidate_years < 3 and detect_seniority(title) == "senior":
+            stats["too_senior"] += 1
+            continue
+
+        # Deprioritize non-India/non-Remote (but don't kill — these sources are mostly remote)
+        # WeWorkRemotely, RemoteOK, Remotive are all remote job boards
+        # so most jobs should classify as 'remote' anyway
+        job["_location"] = loc
+        filtered_jobs.append(job)
+        stats["passed"] += 1
+
+    logger.info(f"Pre-filter: {len(jobs)} → {stats['passed']} "
+                f"(killed {stats['too_senior']} too-senior)")
+    if progress_callback:
+        progress_callback(f"Pre-filter: {len(jobs)} → {stats['passed']} jobs "
+                         f"({stats['too_senior']} too senior removed)")
+
+    jobs = filtered_jobs
+
     # ---- Profile hash for cache isolation ----
     p_hash = profile_hash(profile)
     logger.info(f"Profile hash: {p_hash}")
@@ -300,7 +432,7 @@ def run_pipeline(
             cache_hits += 1
         else:
             # Score with rate limiting
-            score = semantic_score(job, profile_text)
+            score = semantic_score(job, profile_text, candidate_years=candidate_years)
             cache[cache_key] = score
             
             # Rate limit between API calls
@@ -318,6 +450,18 @@ def run_pipeline(
 
     # ---- Sort and limit matches ----
     matches.sort(key=lambda x: x["match_score"], reverse=True)
+
+    # ---- Enforce company diversity (max 3 per company) ----
+    MAX_PER_COMPANY = 3
+    company_count = {}
+    diverse_matches = []
+    for m in matches:
+        co = m.get("company", "Unknown").lower().strip()
+        company_count[co] = company_count.get(co, 0) + 1
+        if company_count[co] <= MAX_PER_COMPANY:
+            diverse_matches.append(m)
+    matches = diverse_matches
+
     matches = matches[:MAX_MATCHES]
     
     logger.info(f"Top {len(matches)} matches selected")
