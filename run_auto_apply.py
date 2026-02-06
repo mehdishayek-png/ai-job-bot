@@ -50,7 +50,7 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
 # Gemini 2.0 Flash: $0.10/M input, $0.40/M output — scoring 30 jobs costs ~$0.001
 # Falls back to mistral if gemini fails
-MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-001")
+MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
 MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))

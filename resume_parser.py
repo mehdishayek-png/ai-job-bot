@@ -26,7 +26,7 @@ client = OpenAI(
     api_key=api_key,
 )
 
-MODEL = "google/gemini-2.0-flash-001"
+MODEL = "google/gemini-2.5-flash"
 
 # =========================
 # TEXT HELPERS
