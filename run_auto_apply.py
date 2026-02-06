@@ -48,7 +48,10 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # CONFIG
 # ============================================
 
-MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-exp:free")
+# Gemini 2.0 Flash: $0.10/M input, $0.40/M output — scoring 30 jobs costs ~$0.001
+# Falls back to mistral if gemini fails
+MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.0-flash-001")
+FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
 MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 30  # Only send this many to LLM
@@ -301,26 +304,33 @@ def parse_batch_scores(text, batch_size):
 
 
 def llm_batch_score(batch, profile, candidate_years):
-    """Score a batch of jobs using LLM. Returns list of scores."""
+    """Score a batch of jobs using LLM. Falls back to FALLBACK_MODEL if primary fails."""
     prompt = build_batch_prompt(batch, profile, candidate_years)
-    try:
-        res = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=300,  # Enough for 15 job scores
-        )
-        text = res.choices[0].message.content.strip()
-        scores = parse_batch_scores(text, len(batch))
-        # Fallback: extract any numbers if parsing failed
-        if sum(scores) == 0 and len(batch) > 1:
-            numbers = re.findall(r'\b(\d{1,3})\b', text)
-            if len(numbers) >= len(batch):
-                scores = [max(0, min(100, int(n))) for n in numbers[:len(batch)]]
-        return scores
-    except Exception as e:
-        logger.error(f"LLM scoring failed: {e}")
-        return [0] * len(batch)
+
+    for model in [MODEL, FALLBACK_MODEL]:
+        try:
+            res = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=300,
+            )
+            text = res.choices[0].message.content.strip()
+            scores = parse_batch_scores(text, len(batch))
+            # Fallback: extract any numbers if parsing failed
+            if sum(scores) == 0 and len(batch) > 1:
+                numbers = re.findall(r'\b(\d{1,3})\b', text)
+                if len(numbers) >= len(batch):
+                    scores = [max(0, min(100, int(n))) for n in numbers[:len(batch)]]
+            if sum(scores) > 0:
+                logger.info(f"LLM scored with {model}")
+                return scores
+        except Exception as e:
+            logger.warning(f"LLM scoring failed with {model}: {e}")
+            continue
+
+    logger.error("All LLM models failed")
+    return [0] * len(batch)
 
 
 # ============================================

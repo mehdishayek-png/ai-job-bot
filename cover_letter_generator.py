@@ -40,7 +40,7 @@ client = OpenAI(
     api_key=api_key,
 )
 
-MODEL = os.getenv("COVER_LETTER_MODEL", "google/gemini-2.0-flash-exp:free")
+MODEL = os.getenv("COVER_LETTER_MODEL", "google/gemini-2.0-flash-001")
 
 # ============================================
 # HTML STRIPPING

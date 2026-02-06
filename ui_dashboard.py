@@ -265,6 +265,13 @@ if not api_key:
 # INTERNAL IMPORTS
 # ============================================
 
+# Clear stale module cache (Streamlit hot-reload can cause KeyError)
+import importlib
+import sys
+for mod_name in ["resume_parser", "run_auto_apply", "cover_letter_generator", "job_fetcher"]:
+    if mod_name in sys.modules:
+        importlib.reload(sys.modules[mod_name])
+
 from resume_parser import build_profile
 from run_auto_apply import run_auto_apply_pipeline
 
