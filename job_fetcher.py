@@ -6,6 +6,11 @@ import time
 import logging
 
 # ============================================
+# NEW: Import our location utilities
+# ============================================
+from location_utils import extract_location_from_job
+
+# ============================================
 # LOGGING SETUP
 # ============================================
 
@@ -139,6 +144,11 @@ def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries
                         "source": source,
                     }
                     
+                    # ============================================
+                    # NEW: Extract location tags from job posting
+                    # ============================================
+                    job["location_tags"] = extract_location_from_job(job)
+                    
                     # Validate required fields
                     if job["title"] and job["apply_url"]:
                         jobs.append(job)
@@ -232,6 +242,11 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
                     "source": "Remotive",
                 }
                 
+                # ============================================
+                # NEW: Extract location tags from job posting
+                # ============================================
+                job["location_tags"] = extract_location_from_job(job)
+                
                 # Validate required fields
                 if job["title"] and job["apply_url"]:
                     jobs.append(job)
@@ -272,7 +287,7 @@ def fetch_all(output_path: str = None) -> list:
         output_path: Path to save jobs JSON file
         
     Returns:
-        list: All fetched jobs
+        list: All fetched jobs (now with location_tags!)
     """
     output_path = output_path or OUTPUT_DEFAULT
     all_jobs = []
@@ -318,6 +333,18 @@ def fetch_all(output_path: str = None) -> list:
         )
     
     logger.info(f"Total jobs fetched: {len(all_jobs)}")
+    
+    # ============================================
+    # NEW: Log location distribution
+    # ============================================
+    location_stats = {}
+    for job in all_jobs:
+        for tag in job.get("location_tags", ["global"]):
+            location_stats[tag] = location_stats.get(tag, 0) + 1
+    
+    logger.info("Location distribution:")
+    for region, count in sorted(location_stats.items()):
+        logger.info(f"  {region}: {count} jobs")
     
     # Deduplicate jobs based on URL (some jobs may appear on multiple boards)
     seen_urls = set()
@@ -374,6 +401,18 @@ if __name__ == "__main__":
         print("\nBreakdown by source:")
         for source, count in sorted(sources.items()):
             print(f"  {source}: {count} jobs")
+        
+        # ============================================
+        # NEW: Show breakdown by location
+        # ============================================
+        print("\nBreakdown by location/region:")
+        locations = {}
+        for job in jobs:
+            for tag in job.get("location_tags", ["unknown"]):
+                locations[tag] = locations.get(tag, 0) + 1
+        
+        for location, count in sorted(locations.items()):
+            print(f"  {location}: {count} jobs")
     
     except Exception as e:
         print(f"\n❌ Error: {e}")

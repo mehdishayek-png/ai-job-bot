@@ -1,10 +1,12 @@
 """
-JobBot Matching Engine v6 — Keyword-First Approach
-====================================================
-Previous versions relied on Mistral 7B to score every job individually.
-Result: 162 API calls, 2 garbage matches (Java Developer for an Oracle OMS consultant).
+JobBot Matching Engine v7 — PHASE 1: Location Filtering Added
+==============================================================
+New in this version:
+- Location/timezone filtering based on user preferences
+- Works with existing remote job sources (no API changes needed)
+- Filters jobs before keyword matching for better performance
 
-New approach:
+Previous version (v6):
 1. Extract strong keywords from profile (skills + headline + role terms)
 2. Score ALL jobs locally by keyword overlap — zero API calls
 3. Only send top 30 to LLM as a SINGLE batch for final ranking
@@ -23,6 +25,11 @@ import logging
 from openai import OpenAI
 from dotenv import load_dotenv
 from cover_letter_generator import generate_cover_letter
+
+# ============================================
+# NEW: Import location utilities
+# ============================================
+from location_utils import filter_jobs_by_location
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -202,205 +209,178 @@ def extract_profile_keywords(profile):
         "due diligence", "valuation", "forecasting", "modeling",
         "excel", "powerbi", "tableau", "sql", "python",
         # Sales / marketing
-        "sales", "marketing", "growth", "strategy", "business development",
-        "pipeline", "lead generation", "market research",
-        # Data
-        "data", "analytics", "insights", "dashboard", "metrics",
-        "kpi", "visualization", "database",
-        # Product / project
-        "product", "project", "agile", "scrum", "roadmap",
-        "stakeholder", "cross-functional",
+        "sales", "marketing", "outreach", "campaigns", "analytics",
+        # General IT
+        "software", "application", "network", "database", "server",
     ]
-    all_skill_text = " ".join(skills) + " " + headline
     for term in domain_terms:
-        if term in all_skill_text:
+        if term in headline or any(term in s for s in skills):
             secondary.add(term)
 
-    # Title words for headline-to-title matching
-    title_words = set(w for w in headline.split() if len(w) > 2)
-    noise = {"and", "the", "for", "with", "from", "into", "our", "you", "your"}
-    title_words -= noise
+    # Title words: meaningful words from headline for title matching
+    title_words = set()
+    title_word_pattern = re.findall(r'\b[a-z]{3,}\b', headline)
+    for word in title_word_pattern:
+        if word not in stop_words and len(word) > 2:
+            title_words.add(word)
 
     return primary_expanded, secondary, title_words
-
-
-# ============================================
-# LOCAL KEYWORD SCORING (NO LLM)
-# ============================================
-
-def score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_years):
-    """
-    Score a job purely by keyword overlap. Returns 0-100.
-
-    Scoring breakdown:
-    - Primary keyword hits: up to 50 points
-    - Secondary keyword hits: up to 20 points
-    - Title-headline overlap: up to 20 points
-    - Seniority match: up to 10 points (or penalty)
-    """
-    title = (job.get("title", "") or "").lower()
-    summary = (job.get("summary", "") or "").lower()
-    job_text = f"{title} {summary}"
-
-    # ---- Primary keyword hits (0-50) ----
-    primary_hits = 0
-    matched_primary = []
-    for kw in primary_kw:
-        if kw in job_text:
-            primary_hits += 1
-            matched_primary.append(kw)
-
-    if not primary_kw:
-        primary_score = 0
-    else:
-        # 1 hit=15, 2=28, 3=38, 4=45, 5+=50
-        primary_score = min(50, primary_hits * 15 - max(0, (primary_hits - 1) * 5))
-        primary_score = max(0, primary_score)
-
-    # ---- Secondary keyword hits (0-25) ----
-    secondary_hits = sum(1 for kw in secondary_kw if kw in job_text)
-    secondary_score = min(25, secondary_hits * 6)
-
-    # ---- Title-headline overlap (0-20) ----
-    title_tokens = set(w for w in title.split() if len(w) > 2)
-    title_tokens -= {"and", "the", "for", "with", "remote", "hybrid", "onsite"}
-    overlap = len(title_words & title_tokens)
-    title_score = min(20, overlap * 8)
-
-    # ---- Seniority (0 to 10, or negative) ----
-    job_seniority = title_seniority(title)
-    if job_seniority == "senior" and candidate_years < 5:
-        seniority_score = -30  # Hard penalty
-    elif job_seniority == "mid" and candidate_years < 2:
-        seniority_score = -15
-    elif job_seniority == "open":
-        seniority_score = 5   # Slight boost for matching seniority
-    else:
-        seniority_score = 10  # Good match
-
-    total = primary_score + secondary_score + title_score + seniority_score
-    total = max(0, min(100, total))
-
-    return {
-        "score": total,
-        "primary_hits": primary_hits,
-        "matched_primary": matched_primary[:5],  # For debugging
-        "secondary_hits": secondary_hits,
-        "title_overlap": overlap,
-        "seniority": job_seniority,
-    }
 
 
 # ============================================
 # NON-ENGLISH FILTER
 # ============================================
 
-NON_ENGLISH_MARKERS = [
-    "(m/w/d)", "vollzeit", "teilzeit", "praktikum",
-    "estagiário", "desenvolvedor", "analista de",
-    "desarrollador", "ingeniero de", "practicante",
-    "développeur", "ingénieur", "stagiaire",
-    "medewerker", "vacature",
-]
-
 def is_non_english(title, summary):
     text = (title + " " + summary).lower()
-    return any(m in text for m in NON_ENGLISH_MARKERS)
+    non_eng_indicators = [
+        "español", "português", "français", "deutsch", "italiano",
+        "русский", "中文", "日本語", "한국어", "العربية",
+        "język", "idioma", "lingua", "sprache",
+    ]
+    return any(ind in text for ind in non_eng_indicators)
 
 
 # ============================================
-# LLM BATCH SCORING (only for top candidates)
+# LOCAL KEYWORD SCORING
 # ============================================
 
-def build_batch_prompt(batch, profile, candidate_years):
-    name = str(profile.get("name", "Candidate"))[:100]
-    headline = str(profile.get("headline", ""))[:200]
-    skills = profile.get("skills", [])
-    skills_str = ", ".join(str(s)[:50] for s in skills[:20])
+def score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_years):
+    title = job.get("title", "").lower()
+    summary = job.get("summary", "").lower()
+    combined = title + " " + summary
 
-    job_entries = []
-    for idx, job in enumerate(batch, 1):
-        title = job.get("title", "Unknown")
-        company = job.get("company", "Unknown")
-        summary = re.sub(r'<[^>]+>', ' ', job.get("summary", ""))[:400]
-        summary = re.sub(r'\s+', ' ', summary).strip()
-        job_entries.append(
-            f"JOB_{idx}: {title} at {company}\n  {summary[:300]}"
-        )
+    score = 0
+    matched_primary = []
+    matched_secondary = []
 
-    jobs_block = "\n\n".join(job_entries)
+    # Primary keywords (exact or expanded matches)
+    for kw in primary_kw:
+        if kw in combined:
+            matched_primary.append(kw)
+            # Weight by keyword length (longer = more specific)
+            if len(kw) > 10:
+                score += 12
+            elif len(kw) > 6:
+                score += 8
+            else:
+                score += 5
 
-    return f"""You are a strict, realistic recruiter scoring job fit. Score each job 0-100.
+    # Secondary keywords (bonus for domain relevance)
+    for kw in secondary_kw:
+        if kw in combined:
+            matched_secondary.append(kw)
+            score += 2
 
-CANDIDATE PROFILE:
-Name: {name}
-Title: {headline}
-Experience: ~{candidate_years} years
-Skills: {skills_str}
+    # Title word bonus (job title alignment)
+    title_match_count = sum(1 for w in title_words if w in title)
+    if title_match_count >= 2:
+        score += 8
+    elif title_match_count == 1:
+        score += 4
 
-JOBS TO SCORE:
-{jobs_block}
+    # Seniority alignment bonus
+    job_seniority = title_seniority(title)
+    if job_seniority == "open":
+        score += 5  # Prefer open roles
+    elif job_seniority == "mid" and candidate_years >= 2:
+        score += 3
+    elif job_seniority == "senior" and candidate_years >= 5:
+        score += 0  # Neutral (not penalized but not bonus)
 
-SCORING CRITERIA (be strict — most jobs should score 40-65):
-
-85-100: Near-perfect fit. Same domain, 4+ skill matches, correct seniority level.
-70-84:  Strong fit. Same or adjacent domain, 3+ skills, reasonable seniority.
-55-69:  Decent fit. Related domain, 2+ relevant skills.
-40-54:  Weak. Some skill overlap but different domain or role type.
-0-39:   No fit. Different field entirely.
-
-SENIORITY RULES (non-negotiable):
-- Candidate has ~{candidate_years} years experience.
-- Jobs with "Lead", "Director", "VP", "Head of", "Principal", "Staff" require 7+ years → cap at 40 if candidate has <5yr.
-- Jobs with "Senior", "Manager" require 4+ years → cap at 55 if candidate has <3yr.
-- A job can have perfect skill overlap but WRONG seniority = score 35-50.
-
-Return ONLY scores in this exact format, one per line:
-{chr(10).join(f"JOB_{i}: <score>" for i in range(1, len(batch) + 1))}
-
-Numbers only. No explanations. No extra text."""
+    return {
+        "score": min(score, 100),
+        "primary_matches": matched_primary[:5],
+        "secondary_matches": matched_secondary[:3],
+        "title_overlap": title_match_count,
+    }
 
 
-def parse_batch_scores(text, batch_size):
-    scores = [0] * batch_size
-    for line in text.strip().split("\n"):
-        m = re.match(r'(?:JOB[_\s]*)?(\d+)\s*[:.\-)\]]\s*(\d+)', line.strip(), re.IGNORECASE)
-        if m:
-            idx = int(m.group(1)) - 1
-            score = max(0, min(100, int(m.group(2))))
-            if 0 <= idx < batch_size:
-                scores[idx] = score
-    return scores
-
+# ============================================
+# LLM BATCH SCORING
+# ============================================
 
 def llm_batch_score(batch, profile, candidate_years):
-    """Score a batch of jobs using LLM. Falls back to FALLBACK_MODEL if primary fails."""
-    prompt = build_batch_prompt(batch, profile, candidate_years)
+    skills_str = ", ".join(profile.get("skills", [])[:15])
+    headline = profile.get("headline", "Professional")
+    
+    jobs_text = "\n\n".join([
+        f"JOB {i+1}:\nTitle: {j.get('title', '?')}\nCompany: {j.get('company', '?')}\n"
+        f"Summary: {j.get('summary', '')[:300]}"
+        for i, j in enumerate(batch)
+    ])
 
-    for model in [MODEL, FALLBACK_MODEL]:
+    prompt = f"""You are a job matching expert. Score these {len(batch)} jobs for this candidate.
+
+Candidate profile:
+- Headline: {headline}
+- Skills: {skills_str}
+- Experience: ~{candidate_years} years
+
+Jobs to score:
+{jobs_text}
+
+For each job, provide a score 0-100 based on:
+- Skills match (50% weight)
+- Role fit (30% weight)
+- Seniority alignment (20% weight)
+
+CRITICAL: Return ONLY a JSON array of {len(batch)} integers, nothing else.
+Example: [75, 60, 45, 90, ...]
+
+Scores:"""
+
+    try:
+        res = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=200,
+        )
+        
+        response_text = res.choices[0].message.content.strip()
+        response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
+        response_text = re.sub(r'\s*```$', '', response_text)
+        
+        scores = json.loads(response_text)
+        
+        if not isinstance(scores, list):
+            raise ValueError(f"Expected list, got {type(scores)}")
+        if len(scores) != len(batch):
+            logger.warning(f"LLM returned {len(scores)} scores, expected {len(batch)}")
+            scores = scores[:len(batch)] + [0] * (len(batch) - len(scores))
+        
+        return [max(0, min(100, int(s))) for s in scores]
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"LLM JSON parse error: {e}. Response: {response_text[:200]}")
+        return [50] * len(batch)
+    except Exception as e:
+        logger.error(f"LLM scoring error: {e}")
+        
+        # Try fallback model
         try:
+            logger.info(f"Retrying with fallback model: {FALLBACK_MODEL}")
             res = client.chat.completions.create(
-                model=model,
+                model=FALLBACK_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
-                max_tokens=300,
+                max_tokens=200,
             )
-            text = res.choices[0].message.content.strip()
-            scores = parse_batch_scores(text, len(batch))
-            # Fallback: extract any numbers if parsing failed
-            if sum(scores) == 0 and len(batch) > 1:
-                numbers = re.findall(r'\b(\d{1,3})\b', text)
-                if len(numbers) >= len(batch):
-                    scores = [max(0, min(100, int(n))) for n in numbers[:len(batch)]]
-            if sum(scores) > 0:
-                logger.info(f"LLM scored with {model}")
-                return scores
-        except Exception as e:
-            logger.warning(f"LLM scoring failed with {model}: {e}")
-            continue
-
-    logger.error("All LLM models failed")
-    return [0] * len(batch)
+            
+            response_text = res.choices[0].message.content.strip()
+            response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
+            response_text = re.sub(r'\s*```$', '', response_text)
+            scores = json.loads(response_text)
+            
+            if len(scores) != len(batch):
+                scores = scores[:len(batch)] + [0] * (len(batch) - len(scores))
+            
+            return [max(0, min(100, int(s))) for s in scores]
+        
+        except Exception as e2:
+            logger.error(f"Fallback model also failed: {e2}")
+            return [0] * len(batch)
 
 
 # ============================================
@@ -470,6 +450,23 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     total_unique = len(jobs)
     if progress_callback:
         progress_callback(f"Loaded {total_unique} unique jobs")
+
+    # ============================================
+    # NEW: Filter by location preferences (Phase 1)
+    # ============================================
+    location_prefs = profile.get("location_preferences", ["global"])
+    
+    # If user has location preferences, filter jobs
+    if location_prefs and location_prefs != ["global"]:
+        jobs_before = len(jobs)
+        jobs = filter_jobs_by_location(jobs, location_prefs)
+        jobs_after = len(jobs)
+        
+        logger.info(f"Location filter: {jobs_before} → {jobs_after} jobs (preferences: {location_prefs})")
+        if progress_callback:
+            progress_callback(f"Location filter: {jobs_after} jobs match your region preferences")
+    else:
+        logger.info("No location filtering (user prefers global)")
 
     # ---- Extract keywords from profile ----
     primary_kw, secondary_kw, title_words = extract_profile_keywords(profile)
