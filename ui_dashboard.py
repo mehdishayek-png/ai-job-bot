@@ -509,6 +509,7 @@ try:
     from resume_parser import build_profile
     from run_auto_apply import run_auto_apply_pipeline
     from cover_letter_generator import generate_cover_letter
+    from location_utils import get_all_regions, get_region_display_name
 except ImportError as e:
     st.error(f"Missing required module: {e}. Please ensure all files are in the same directory.")
     st.stop()
@@ -732,6 +733,15 @@ if profile and profile.get("skills"):
         skills_html = "".join([f'<span class="skill-chip">{s}</span>' for s in skills])
         st.markdown(f'<div class="skills-container">{skills_html}</div>', unsafe_allow_html=True)
         st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
+
+    # Display location preferences
+    if profile.get("location_preferences"):
+        prefs = profile["location_preferences"]
+        pref_names = []
+        name_map = {"americas": "Americas", "europe": "Europe", "asia": "Asia-Pacific", "global": "Global"}
+        for p in prefs:
+            pref_names.append(name_map.get(p, p.title()))
+        st.caption(f"📍 Regions: {', '.join(pref_names)}")
 else:
     st.info("👆 Upload your resume to get started, or create a profile manually below")
 
