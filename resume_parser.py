@@ -1,9 +1,14 @@
 """
-Resume Parser v2
+Resume Parser v3
 ================
-Extracts 8-12 high-signal skills that carry real weight in job matching.
-No more dumping every keyword — only the ones that would actually
-appear as requirements in job postings the candidate should target.
+Extracts:
+  - 8-12 high-signal SKILLS (tools, platforms, methodologies)
+  - 5-8 ROLE KEYWORDS (function-level terms like "incident management",
+    "customer support", "ticket triage" that describe WHAT you do)
+
+The role_keywords are critical for matching: a job saying "manage customer
+escalations" should match someone who does "incident triage" even if the
+exact phrase never appears in either.
 """
 
 import pdfplumber
@@ -79,49 +84,49 @@ def extract_headline(lines):
 
 
 # =========================
-# LLM EXTRACTION — FOCUSED
+# LLM EXTRACTION
 # =========================
 
 def extract_profile_with_llm(text):
-    """
-    Extract profile with STRICT 8-12 skill selection.
-    Only skills that would appear as job posting requirements.
-    """
+    prompt = f"""You are an expert recruiter. Extract this candidate's profile.
 
-    prompt = f"""You are an expert recruiter reviewing a resume. Extract the candidate's profile.
+Return JSON with FOUR keys: "name", "headline", "skills", "role_keywords"
 
-RULES FOR SKILLS — THIS IS CRITICAL:
-Return exactly 8-12 skills. No more, no less.
+=== SKILLS (8-12 items) ===
+Specific tools, platforms, and methodologies that would appear as REQUIREMENTS in job postings.
 
-Pick ONLY skills that:
-1. Would appear as REQUIREMENTS in a job posting the candidate should apply to
-2. Are specific enough to differentiate this candidate (not generic like "communication")
-3. Represent the candidate's PRIMARY professional value
+Pick ONLY:
+- Core tools/platforms: "Zendesk", "Salesforce", "Okta", "JIRA", "Workato"
+- Domain expertise: "SaaS operations", "identity access management"
+- Methodologies: "incident management", "root cause analysis", "SLA management"
 
-SKILL PRIORITY ORDER (pick from top categories first):
-- Core tools/platforms they use daily (e.g. "Zendesk", "Salesforce", "JIRA")
-- Professional domain expertise (e.g. "customer success", "SaaS operations")
-- Industry-specific methodologies (e.g. "agile", "six sigma", "NPS management")
-- Technical skills ONLY if relevant to their role (e.g. "SQL" for an analyst)
+DO NOT include:
+- Languages spoken (hindi, english, etc.)
+- Soft skills (communication, leadership, attention to detail)
+- Generic tools (Microsoft Office, email, Google Docs)
+- Company names as skills (Netflix, OpenAI, etc.)
 
-DO NOT INCLUDE:
-- Languages spoken (e.g. "hindi", "english", "malayalam")
-- Soft skills (e.g. "attention to detail", "communication", "leadership")
-- One-off or very niche tools unless they define the role
-- Skills that appear in every resume (e.g. "Microsoft Office", "email")
-- Company names or job titles as skills
-- Hobbies or non-professional skills
+=== ROLE KEYWORDS (5-8 items) ===
+These describe the FUNCTION the candidate performs — the type of work, not the tools.
+These are critical because job postings often describe the same work using different words.
 
-EXAMPLE — for a Customer Experience & Operations Leader:
-GOOD: ["customer success", "zendesk", "salesforce", "saas", "nps management", "process optimization", "customer onboarding", "churn reduction", "cross-functional coordination", "quality assurance"]
-BAD: ["hindi", "attention to detail", "graphic design", "subtitles", "english", "communication", "prime video", "netflix", "brand voice development", "visual communication"]
+Examples of good role_keywords:
+- "customer support", "customer experience", "customer success"
+- "incident triage", "ticket escalation", "issue resolution"
+- "technical troubleshooting", "enterprise support"
+- "stakeholder communication", "cross-functional coordination"
+- "process documentation", "SOP development"
+- "account management", "client onboarding"
+- "QA testing", "beta testing", "product feedback"
 
-Return ONLY valid JSON with keys: "name", "headline", "skills"
-- "skills" must be exactly 8-12 items
-- Lowercase all skills
-- No duplicates
+Think: if a recruiter searched for candidates, what job FUNCTIONS would they search?
 
-Resume text:
+=== FORMAT ===
+Return ONLY valid JSON:
+{{"name": "...", "headline": "...", "skills": ["8-12 items"], "role_keywords": ["5-8 items"]}}
+All lowercase. No duplicates.
+
+Resume:
 {text[:6000]}
 
 JSON:"""
@@ -131,35 +136,24 @@ JSON:"""
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=400,
+            max_tokens=500,
         )
 
         response_text = res.choices[0].message.content.strip()
-
-        # Clean markdown fences
         if response_text.startswith("```"):
             response_text = re.sub(r'^```(?:json)?\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
 
-        profile_data = json.loads(response_text)
-
-        if not isinstance(profile_data, dict):
+        data = json.loads(response_text)
+        if not isinstance(data, dict):
             raise ValueError("Not a dict")
 
-        profile_data.setdefault("name", "Candidate")
-        profile_data.setdefault("headline", "")
-        profile_data.setdefault("skills", [])
+        data.setdefault("name", "Candidate")
+        data.setdefault("headline", "")
+        data.setdefault("skills", [])
+        data.setdefault("role_keywords", [])
 
-        if not isinstance(profile_data["skills"], list):
-            profile_data["skills"] = []
-
-        # Clean, deduplicate, enforce limits
-        raw_skills = list(dict.fromkeys([
-            s.strip().lower() for s in profile_data["skills"]
-            if isinstance(s, str) and s.strip() and len(s.strip()) > 2
-        ]))
-
-        # Filter out common garbage that LLMs love to include
+        # Clean skills
         garbage = {
             "communication", "communication skills", "teamwork", "team player",
             "problem solving", "problem-solving", "leadership", "time management",
@@ -172,14 +166,22 @@ JSON:"""
             "work ethic", "self-motivated", "fast learner", "hard working",
             "microsoft word", "microsoft excel", "powerpoint", "google docs",
         }
-        filtered = [s for s in raw_skills if s not in garbage]
 
-        # Enforce 8-12 range
-        if len(filtered) > 12:
-            filtered = filtered[:12]
+        skills = list(dict.fromkeys([
+            s.strip().lower() for s in data["skills"]
+            if isinstance(s, str) and s.strip() and len(s.strip()) > 2
+            and s.strip().lower() not in garbage
+        ]))[:12]
 
-        profile_data["skills"] = filtered
-        return profile_data
+        role_kw = list(dict.fromkeys([
+            s.strip().lower() for s in data["role_keywords"]
+            if isinstance(s, str) and s.strip() and len(s.strip()) > 2
+            and s.strip().lower() not in garbage
+        ]))[:8]
+
+        data["skills"] = skills
+        data["role_keywords"] = role_kw
+        return data
 
     except Exception as e:
         print(f"LLM extraction failed: {e}")
@@ -187,15 +189,9 @@ JSON:"""
 
 
 def extract_skills_fallback(text):
-    """Fallback: extract just skills with strict limits."""
-
     prompt = f"""Extract the 10 most important professional skills from this resume.
-
-RULES:
-- Return a JSON array of exactly 10 skills
-- Only skills that would appear as REQUIREMENTS in a job posting
-- No languages spoken, no soft skills, no generic office tools
-- Lowercase
+Only skills that would appear as REQUIREMENTS in a job posting.
+No languages, soft skills, or generic tools. Lowercase. JSON array only.
 
 Resume:
 {text[:6000]}
@@ -209,21 +205,17 @@ Return: ["skill1", "skill2", ...]"""
             temperature=0,
             max_tokens=200,
         )
-
         response_text = res.choices[0].message.content.strip()
         if response_text.startswith("```"):
             response_text = re.sub(r'^```(?:json)?\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
-
         skills = json.loads(response_text)
         if not isinstance(skills, list):
             return []
-
         return list(dict.fromkeys([
             s.strip().lower() for s in skills
             if isinstance(s, str) and s.strip() and len(s.strip()) > 2
         ]))[:12]
-
     except Exception as e:
         print(f"Skill fallback failed: {e}")
         return []
@@ -234,25 +226,22 @@ Return: ["skill1", "skill2", ...]"""
 # =========================
 
 def build_profile(pdf_path, output_path):
-    """Extract focused profile from resume PDF."""
-
     raw_text = extract_text(pdf_path)
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
 
     if not lines:
         raise ValueError("Could not extract text from PDF")
 
-    # Try LLM extraction
     profile = extract_profile_with_llm(raw_text)
 
     if profile and profile.get("skills"):
-        print(f"✓ LLM: name={profile.get('name')}, skills={len(profile.get('skills', []))}")
+        print(f"✓ LLM: name={profile.get('name')}, skills={len(profile.get('skills', []))}, role_kw={len(profile.get('role_keywords', []))}")
     else:
         print("⚠ LLM failed, using fallback")
         name = extract_name(lines)
         headline = extract_headline(lines)
         skills = extract_skills_fallback(raw_text)
-        profile = {"name": name, "headline": headline, "skills": skills}
+        profile = {"name": name, "headline": headline, "skills": skills, "role_keywords": []}
 
     if not profile.get("name") or profile["name"] == "":
         profile["name"] = extract_name(lines) or "Candidate"
@@ -264,17 +253,14 @@ def build_profile(pdf_path, output_path):
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
 
-    print(f"✓ Profile saved: {output_path}")
+    print(f"✓ Saved: {output_path}")
     print(f"  Name: {profile['name']}")
     print(f"  Headline: {profile.get('headline', 'N/A')}")
     print(f"  Skills ({len(profile['skills'])}): {', '.join(profile['skills'])}")
+    print(f"  Role KW ({len(profile.get('role_keywords', []))}): {', '.join(profile.get('role_keywords', []))}")
 
     return profile
 
-
-# =========================
-# CLI
-# =========================
 
 if __name__ == "__main__":
     import sys
