@@ -183,6 +183,9 @@ GREENHOUSE_BOARDS = [
 ]
 
 
+GREENHOUSE_PER_BOARD_CAP = 50  # Don't pull 600+ jobs from one company
+
+
 def fetch_greenhouse():
     all_jobs = []
     session = get_session()
@@ -196,6 +199,8 @@ def fetch_greenhouse():
             data = resp.json()
             count = 0
             for j in data.get("jobs", []):
+                if count >= GREENHOUSE_PER_BOARD_CAP:
+                    break
                 title = j.get("title", "").strip()
                 abs_url = j.get("absolute_url", "").strip()
                 if not title or not abs_url:
@@ -212,7 +217,8 @@ def fetch_greenhouse():
                 })
                 count += 1
             if count:
-                logger.info(f"Greenhouse/{board}: {count}")
+                capped = " (capped)" if count >= GREENHOUSE_PER_BOARD_CAP else ""
+                logger.info(f"Greenhouse/{board}: {count}{capped}")
             time.sleep(0.3)
         except Exception as e:
             logger.warning(f"Greenhouse/{board}: {e}")
@@ -281,22 +287,38 @@ def fetch_lever():
 # 6. Ashby (API)
 # ============================================
 
+# Slugs must match exactly what's in jobs.ashbyhq.com/{slug}
+# Case-sensitive! Found by checking each company's Ashby job board URL.
 ASHBY_BOARDS = [
-    "ramp", "notion", "linear", "vercel", "mercury",
-    "deel", "brex", "plaid", "retool", "clerk",
+    "Ramp", "Notion", "Linear", "Vercel", "Mercury",
+    "Deel", "Brex", "Plaid", "Retool", "Clerk",
+    "OpenAI", "Anthropic", "Coda", "Anduril", "Abridge",
 ]
 
 
 def fetch_ashby():
     all_jobs = []
     session = get_session()
+    session.headers.update({"Accept": "application/json"})
+
     for board in ASHBY_BOARDS:
         try:
             url = f"https://api.ashbyhq.com/posting-api/job-board/{board}"
             resp = session.get(url, timeout=NETWORK_TIMEOUT)
+
             if resp.status_code == 404:
+                logger.debug(f"Ashby/{board}: not found")
                 continue
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                logger.warning(f"Ashby/{board}: HTTP {resp.status_code}")
+                continue
+
+            # Check content type — Ashby may return HTML instead of JSON
+            ct = resp.headers.get("Content-Type", "")
+            if "application/json" not in ct and "text/json" not in ct:
+                logger.warning(f"Ashby/{board}: got {ct} instead of JSON, skipping")
+                continue
+
             data = resp.json()
             count = 0
             for p in data.get("jobs", []):
@@ -306,16 +328,19 @@ def fetch_ashby():
                     continue
                 loc = p.get("location", "")
                 desc = strip_html(p.get("descriptionHtml", p.get("descriptionPlain", "")))[:500]
-                company_name = data.get("organizationName", board.replace("-", " ").title())
+                company_name = data.get("organizationName", board)
                 all_jobs.append({
                     "title": title, "company": company_name,
                     "summary": desc, "apply_url": job_url,
-                    "source": "Ashby", "location": loc if isinstance(loc, str) else "",
+                    "source": "Ashby",
+                    "location": loc if isinstance(loc, str) else "",
                 })
                 count += 1
             if count:
                 logger.info(f"Ashby/{board}: {count}")
             time.sleep(0.3)
+        except ValueError as e:
+            logger.warning(f"Ashby/{board}: JSON parse error — {e}")
         except Exception as e:
             logger.warning(f"Ashby/{board}: {e}")
     logger.info(f"Ashby total: {len(all_jobs)} jobs")
@@ -326,11 +351,16 @@ def fetch_ashby():
 # 7. Workday (POST API)
 # ============================================
 
+# Format: (company_slug, wd_instance, site_path)
+# URL: https://{slug}.{instance}.myworkdayjobs.com/wday/cxs/{slug}/{site}/jobs
+# Verified from actual career pages
 WORKDAY_BOARDS = [
-    ("salesforce", "wd12", "salesforce", "External_Career_Site"),
-    ("servicenow", "wd1", "servicenow", "Careers"),
-    ("visa", "wd5", "visa", "Visa_Careers"),
-    ("adobe", "wd5", "adobe", "external_experienced"),
+    ("workday", "wd5", "Workday"),
+    ("mastercard", "wd1", "CorporateCareers"),
+    ("salesforce", "wd12", "External_Career_Site"),
+    ("walmart", "wd5", "WalmartExternal"),
+    ("adobe", "wd5", "external_experienced"),
+    ("servicenow", "wd1", "Careers"),
 ]
 
 
@@ -338,26 +368,35 @@ def fetch_workday():
     all_jobs = []
     session = get_session()
     session.headers.update({"Content-Type": "application/json"})
-    for company_slug, instance, path_co, site in WORKDAY_BOARDS:
+
+    for company_slug, instance, site in WORKDAY_BOARDS:
         try:
-            url = f"https://{company_slug}.{instance}.myworkday.com/wday/cxs/{path_co}/{site}/jobs"
+            # Correct Workday public career site URL format
+            base = f"https://{company_slug}.{instance}.myworkdayjobs.com"
+            url = f"{base}/wday/cxs/{company_slug}/{site}/jobs"
+
             payload = {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": ""}
             resp = session.post(url, json=payload, timeout=NETWORK_TIMEOUT)
-            if resp.status_code in (404, 403, 500):
+
+            if resp.status_code in (404, 403, 500, 503):
+                logger.debug(f"Workday/{company_slug}: HTTP {resp.status_code}")
                 continue
+
             resp.raise_for_status()
             data = resp.json()
             count = 0
+
             for p in data.get("jobPostings", []):
                 title = p.get("title", "").strip()
                 ext_path = p.get("externalPath", "")
                 if not title or not ext_path:
                     continue
-                apply_url = f"https://{company_slug}.{instance}.myworkday.com/en-US{ext_path}"
+                apply_url = f"{base}/en-US{ext_path}"
                 loc = p.get("locationsText", "")
                 posted = p.get("postedOn", "")
                 all_jobs.append({
-                    "title": title, "company": company_slug.replace("-", " ").title(),
+                    "title": title,
+                    "company": company_slug.replace("-", " ").title(),
                     "summary": f"Location: {loc}. Posted: {posted}".strip(),
                     "apply_url": apply_url, "source": "Workday", "location": loc,
                 })
@@ -376,92 +415,150 @@ def fetch_workday():
 # ============================================
 
 NAUKRI_MAX_JOBS = 10
-NAUKRI_KEYWORDS = ["customer success", "operations manager", "customer experience", "technical account manager"]
+# Broad search URLs — one per keyword, public page scrape not internal API
+NAUKRI_SEARCHES = [
+    "https://www.naukri.com/customer-experience-jobs?k=customer+experience&experience=2&jobAge=7",
+    "https://www.naukri.com/customer-success-jobs?k=customer+success&experience=2&jobAge=7",
+    "https://www.naukri.com/operations-manager-jobs?k=operations+manager&experience=2&jobAge=7",
+]
 
 
 def detect_ip_block(response):
     if response.status_code in (403, 429, 503):
         return True, f"HTTP {response.status_code}"
-    content = response.text[:2000].lower()
+    content = response.text[:3000].lower()
     signals = ["captcha", "recaptcha", "cf-challenge", "cloudflare",
                "access denied", "blocked", "suspicious activity",
-               "rate limit", "too many requests", "bot detection"]
+               "rate limit", "too many requests", "bot detection",
+               "please verify you are a human"]
     for sig in signals:
         if sig in content:
             return True, f"Block signal: '{sig}'"
-    ct = response.headers.get("Content-Type", "")
-    if "text/html" in ct and response.status_code == 200:
-        if "jobdetails" not in content and "noOfJobs" not in content.replace(" ", ""):
-            return True, "Unexpected HTML"
     return False, ""
 
 
+def parse_naukri_html(html_text):
+    """
+    Parse Naukri search results from HTML.
+    Naukri embeds job data in script tags as JSON.
+    Falls back to regex parsing of article/job cards.
+    """
+    jobs = []
+
+    # Method 1: Try to find embedded JSON in script tags
+    json_match = re.search(r'"jobDetails"\s*:\s*(\[.+?\])\s*[,}]', html_text)
+    if json_match:
+        try:
+            job_list = json.loads(json_match.group(1))
+            for item in job_list:
+                title = item.get("title", "").strip()
+                company = item.get("companyName", "Unknown").strip()
+                job_id = item.get("jobId", "")
+                snippet = strip_html(item.get("jobDescription", ""))[:400]
+
+                loc = ""
+                for ph in item.get("placeholders", []):
+                    if isinstance(ph, dict) and ph.get("type") == "location":
+                        loc = ph.get("label", "")
+
+                apply_url = f"https://www.naukri.com/job-listings-{job_id}" if job_id else ""
+
+                if title:
+                    jobs.append({
+                        "title": title, "company": company, "summary": snippet,
+                        "apply_url": apply_url, "source": "Naukri", "location": loc,
+                    })
+            return jobs
+        except Exception:
+            pass
+
+    # Method 2: Regex fallback — extract from article tags
+    articles = re.findall(
+        r'class="[^"]*jobTuple[^"]*"[^>]*>.*?</article>',
+        html_text, re.DOTALL | re.IGNORECASE
+    )
+    for article in articles[:10]:
+        title_m = re.search(r'class="[^"]*title[^"]*"[^>]*>([^<]+)', article)
+        company_m = re.search(r'class="[^"]*comp[^"]*"[^>]*>([^<]+)', article)
+        url_m = re.search(r'href="(https://www\.naukri\.com/job-listings[^"]*)"', article)
+
+        if title_m:
+            jobs.append({
+                "title": title_m.group(1).strip(),
+                "company": company_m.group(1).strip() if company_m else "Unknown",
+                "summary": "",
+                "apply_url": url_m.group(1) if url_m else "",
+                "source": "Naukri", "location": "",
+            })
+
+    return jobs
+
+
 def fetch_naukri():
+    """
+    Light Naukri scrape — max 10 jobs from India.
+    Scrapes public search result pages, not internal API.
+    """
     all_jobs = []
     session = get_session(rotate_ua=True)
+
+    # Naukri-specific headers to look like a real browser
     session.headers.update({
-        "Accept": "application/json",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Referer": "https://www.naukri.com/",
-        "Origin": "https://www.naukri.com",
         "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "empty", "sec-fetch-mode": "cors", "sec-fetch-site": "same-origin",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+        "Upgrade-Insecure-Requests": "1",
     })
+
     ip_blocked = False
 
-    for keyword in NAUKRI_KEYWORDS:
+    for search_url in NAUKRI_SEARCHES:
         if ip_blocked or len(all_jobs) >= NAUKRI_MAX_JOBS:
             break
+
         try:
-            time.sleep(random.uniform(2.0, 4.0))
-            resp = session.get("https://www.naukri.com/jobapi/v3/search", params={
-                "noOfResults": 5, "urlType": "search_by_keyword", "searchType": "adv",
-                "keyword": keyword, "location": "india", "jobAge": 7, "experience": 2,
-            }, timeout=NETWORK_TIMEOUT)
+            # Polite delay with jitter
+            time.sleep(random.uniform(2.5, 5.0))
+
+            resp = session.get(search_url, timeout=NETWORK_TIMEOUT)
 
             blocked, reason = detect_ip_block(resp)
             if blocked:
                 logger.warning(f"Naukri IP BLOCK: {reason}")
                 ip_blocked = True
                 break
-            resp.raise_for_status()
 
-            try:
-                data = resp.json()
-            except Exception:
-                ip_blocked = True
-                break
+            if resp.status_code != 200:
+                logger.warning(f"Naukri: HTTP {resp.status_code} for {search_url[:60]}")
+                continue
 
-            for p in data.get("jobDetails", []):
+            page_jobs = parse_naukri_html(resp.text)
+            for j in page_jobs:
                 if len(all_jobs) >= NAUKRI_MAX_JOBS:
                     break
-                title = p.get("title", "").strip()
-                company = p.get("companyName", "Unknown").strip()
-                job_id = p.get("jobId", "")
-                if not title:
-                    continue
-                apply_url = f"https://www.naukri.com/job-listings-{job_id}" if job_id else ""
-                snippet = strip_html(p.get("jobDescription", ""))[:400]
-                location = ""
-                for ph in p.get("placeholders", []):
-                    if isinstance(ph, dict) and ph.get("type") == "location":
-                        location = ph.get("label", "")
-                all_jobs.append({
-                    "title": title, "company": company, "summary": snippet,
-                    "apply_url": apply_url, "source": "Naukri", "location": location,
-                })
-            logger.info(f"Naukri/'{keyword}': fetched")
+                all_jobs.append(j)
+
+            keyword = re.search(r'k=([^&]+)', search_url)
+            kw_name = keyword.group(1).replace('+', ' ') if keyword else "?"
+            logger.info(f"Naukri/'{kw_name}': {len(page_jobs)} jobs parsed")
+
+        except requests.Timeout:
+            logger.warning("Naukri: timeout")
         except requests.RequestException as e:
             if "403" in str(e) or "429" in str(e):
                 ip_blocked = True
                 break
-            logger.warning(f"Naukri/'{keyword}': {e}")
+            logger.warning(f"Naukri: {e}")
         except Exception as e:
-            logger.warning(f"Naukri/'{keyword}': {e}")
+            logger.warning(f"Naukri: {e}")
 
     if ip_blocked:
-        logger.warning(f"Naukri: stopped early (IP block) — got {len(all_jobs)} jobs")
+        logger.warning(f"Naukri: IP blocked — got {len(all_jobs)} before block")
     else:
         logger.info(f"Naukri total: {len(all_jobs)} jobs")
     return all_jobs
