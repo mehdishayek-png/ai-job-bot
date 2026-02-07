@@ -1,0 +1,22 @@
+2026-02-05 17:40:33.417025 → Generating cover letter → TestCorp_Customer Success Manager
+2026-02-05 17:40:36.947875 → Saved → output/cover_letters\TestCorp__Customer_Success_Manager.txt
+2026-02-05 18:04:16.165844 → Generating cover letter → Unknown_Aristocrat Technologies: CRM & Loyalty Manager
+2026-02-05 18:04:19.017372 → Saved → output/cover_letters\Unknown__Aristocrat_Technologies_CRM__Loyalty_Manager.txt
+2026-02-05 18:04:19.018565 → Generating cover letter → RemoteOK_AI Automation Engineer Tech Lead
+2026-02-05 18:04:21.930792 → Saved → output/cover_letters\RemoteOK__AI_Automation_Engineer_Tech_Lead.txt
+2026-02-05 18:04:21.932003 → Generating cover letter → RemoteOK_Product Data Analyst
+2026-02-05 18:04:25.048752 → Saved → output/cover_letters\RemoteOK__Product_Data_Analyst.txt
+2026-02-05 18:04:25.049988 → Generating cover letter → RemoteOK_Revenue Operations Analyst
+2026-02-05 18:04:28.216711 → Saved → output/cover_letters\RemoteOK__Revenue_Operations_Analyst.txt
+2026-02-05 18:04:28.217932 → Generating cover letter → Unknown_HubSpot: Senior Director, Talent Acquisition Operations & Programs
+2026-02-05 18:04:31.215543 → Saved → output/cover_letters\Unknown__HubSpot_Senior_Director_Talent_Acquisition_Operations__Programs.txt
+2026-02-05 18:42:10.234087 → Generating cover letter → Unknown_Aristocrat Technologies: CRM & Loyalty Manager
+2026-02-05 18:42:10.234294 → Skipped (cached)
+2026-02-05 18:42:10.235519 → Generating cover letter → RemoteOK_AI Automation Engineer Tech Lead
+2026-02-05 18:42:10.235747 → Skipped (cached)
+2026-02-05 18:42:10.237009 → Generating cover letter → RemoteOK_Product Data Analyst
+2026-02-05 18:42:10.237213 → Skipped (cached)
+2026-02-05 18:42:10.238266 → Generating cover letter → RemoteOK_Revenue Operations Analyst
+2026-02-05 18:42:10.238457 → Skipped (cached)
+2026-02-05 18:42:10.239587 → Generating cover letter → Unknown_HubSpot: Senior Director, Talent Acquisition Operations & Programs
+2026-02-05 18:42:10.239782 → Skipped (cached)

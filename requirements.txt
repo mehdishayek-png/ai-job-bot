@@ -1,0 +1,7 @@
+streamlit
+openai
+python-dotenv
+feedparser
+requests
+beautifulsoup4
+pdfplumber
