@@ -551,7 +551,7 @@ def fetch_serpapi_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> 
 # MAIN FETCH FUNCTION
 # ============================================
 
-def fetch_all(output_path: str = None, serpapi_queries: list = None) -> list:
+def fetch_all(output_path: str = None, serpapi_queries: list = None, prioritize_local: bool = False) -> list:
     """
     Fetch jobs from all sources and save to JSON.
 
@@ -576,48 +576,78 @@ def fetch_all(output_path: str = None, serpapi_queries: list = None) -> list:
 
     logger.info("Starting job fetch from all sources")
 
-    # ---- 1. WeWorkRemotely (RSS feeds) ----
-    for feed_url in WWR_FEEDS:
+    # If the caller requests local prioritization (e.g., user selected a city),
+    # fetch SerpAPI (Google Jobs / Indeed / Naukri) first and avoid bulk remote
+    # boards to increase the relative share of localized results.
+    if prioritize_local:
+        logger.info("Prioritizing local sources: running SerpAPI and Lever first, skipping large remote-only feeds")
+        # 1. SerpAPI (targeted local searches)
         try:
-            jobs = parse_rss(feed_url, "WeWorkRemotely")
+            jobs = fetch_serpapi_jobs(queries=serpapi_queries)
             all_jobs.extend(jobs)
         except Exception as e:
-            logger.error(f"Failed to fetch {feed_url}: {e}")
+            logger.error(f"Failed to fetch SerpAPI: {e}")
 
-    # ---- 2. RemoteOK (RSS) ----
-    try:
-        jobs = parse_rss(REMOTEOK, "RemoteOK")
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Failed to fetch RemoteOK: {e}")
+        # 2. Lever (targeted companies, many with India presence)
+        try:
+            jobs = fetch_lever_jobs()
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Lever: {e}")
 
-    # ---- 3. Jobicy (RSS) ----
-    try:
-        jobs = parse_rss(JOBICY, "Jobicy")
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Failed to fetch Jobicy: {e}")
+        # 3. Optionally include Remotive (smaller remote curated set)
+        try:
+            jobs = fetch_remotive_jobs()
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Remotive: {e}")
 
-    # ---- 4. Remotive (API) ----
-    try:
-        jobs = fetch_remotive_jobs()
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Failed to fetch Remotive: {e}")
+        # Skip large global remote RSS feeds (WeWorkRemotely / RemoteOK / Jobicy)
+        logger.info("Skipped WeWorkRemotely / RemoteOK / Jobicy feeds to favour local sources")
 
-    # ---- 5. Lever (public API, no auth) ----
-    try:
-        jobs = fetch_lever_jobs()
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Failed to fetch Lever: {e}")
+    else:
+        # ---- 1. WeWorkRemotely (RSS feeds) ----
+        for feed_url in WWR_FEEDS:
+            try:
+                jobs = parse_rss(feed_url, "WeWorkRemotely")
+                all_jobs.extend(jobs)
+            except Exception as e:
+                logger.error(f"Failed to fetch {feed_url}: {e}")
 
-    # ---- 6. SerpAPI → Google Jobs (LinkedIn, Indeed, Naukri, etc.) ----
-    try:
-        jobs = fetch_serpapi_jobs(queries=serpapi_queries)
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Failed to fetch SerpAPI: {e}")
+        # ---- 2. RemoteOK (RSS) ----
+        try:
+            jobs = parse_rss(REMOTEOK, "RemoteOK")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch RemoteOK: {e}")
+
+        # ---- 3. Jobicy (RSS) ----
+        try:
+            jobs = parse_rss(JOBICY, "Jobicy")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Jobicy: {e}")
+
+        # ---- 4. Remotive (API) ----
+        try:
+            jobs = fetch_remotive_jobs()
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Remotive: {e}")
+
+        # ---- 5. Lever (public API, no auth) ----
+        try:
+            jobs = fetch_lever_jobs()
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Lever: {e}")
+
+        # ---- 6. SerpAPI → Google Jobs (LinkedIn, Indeed, Naukri, etc.) ----
+        try:
+            jobs = fetch_serpapi_jobs(queries=serpapi_queries)
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch SerpAPI: {e}")
 
     # Check if we got any jobs
     if not all_jobs:

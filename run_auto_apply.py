@@ -504,7 +504,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         serpapi_queries = build_serpapi_queries(profile)
         logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
 
-        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries)
+        # Determine whether to prioritize local sources based on profile location preferences
+        location_prefs = profile.get("location_preferences", ["global"])
+        prioritize_local = bool(location_prefs and location_prefs != ["global"])
+        if prioritize_local:
+            logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
+
+        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
@@ -515,6 +521,26 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     total_unique = len(jobs)
     if progress_callback:
         progress_callback(f"Loaded {total_unique} unique jobs")
+
+    # If user requested local results, prefer local jobs by reordering the list
+    location_prefs = profile.get("location_preferences", ["global"])
+    prioritize_local_run = bool(location_prefs and location_prefs != ["global"]) or bool(user_country_lc)
+    if prioritize_local_run:
+        # Build a simple local-match predicate using country_aliases and location_tags
+        def is_local_job(job):
+            jt = f"{job.get('title','')} {job.get('summary','')} {job.get('company','')} {job.get('source','')}".lower()
+            if any(alias in jt for alias in country_aliases):
+                return True
+            tags = job.get('location_tags', [])
+            if isinstance(tags, (list, tuple)) and any(t in ('asia', user_country_lc) for t in tags):
+                return True
+            return False
+
+        local_jobs = [j for j in jobs if is_local_job(j)]
+        other_jobs = [j for j in jobs if not is_local_job(j)]
+        if local_jobs:
+            logger.info(f"Local prioritization: {len(local_jobs)} local jobs found; reordering to favour them")
+            jobs = local_jobs + other_jobs
 
     # ============================================
     # NEW: Filter by location preferences (Phase 1)
@@ -664,8 +690,9 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             # These are more likely to be relevant, recently posted, and actually hiring
             source = job.get("source", "").lower()
             PRIORITY_SOURCES = {"google jobs", "indeed", "naukri", "linkedin", "instahyre", "foundit", "glassdoor"}
+            priority_boost = 10 if prioritize_local_run else 5
             if source in PRIORITY_SOURCES:
-                combined = min(combined + 5, 100)
+                combined = min(combined + priority_boost, 100)
 
             # Location boost: +8 if job mentions user's country or state/city
             if user_country_lc and user_country_lc != "remote only":
