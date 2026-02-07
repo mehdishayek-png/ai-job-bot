@@ -635,15 +635,21 @@ with col2:
                         f.write(uploaded_resume.getbuffer())
                     
                     # Parse resume
-                    # Preserve country from existing profile
+                    # Preserve user settings from existing profile
                     existing = load_json(PROFILE_FILE)
-                    existing_country = existing.get("country", "India") if existing else "India"
                     
                     profile = build_profile(resume_path, PROFILE_FILE)
                     
-                    # Re-add country to the saved profile
-                    if "country" not in profile:
-                        profile["country"] = existing_country
+                    # Re-add user-set fields that the parser doesn't know about
+                    if existing:
+                        for field in ["country", "state", "experience", "job_preference"]:
+                            if field not in profile and field in existing:
+                                profile[field] = existing[field]
+                        # Set defaults if first time
+                        profile.setdefault("country", "India")
+                        profile.setdefault("state", "Any")
+                        profile.setdefault("experience", "3–6 years")
+                        profile.setdefault("job_preference", "🔀 Both (local + remote)")
                         save_json(PROFILE_FILE, profile)
                     
                     st.success("✅ Resume parsed successfully!")
@@ -746,18 +752,50 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
             index=state_list.index(current_state) if current_state in state_list else 0,
             help="Refines search queries for more local results"
         )
+
+    # Experience and job preference
+    exp_col1, exp_col2 = st.columns(2)
+    with exp_col1:
+        EXP_OPTIONS = ["0–1 years", "1–3 years", "3–6 years", "6–10 years", "10+ years"]
+        current_exp = profile.get("experience", "3–6 years") if profile else "3–6 years"
+        if current_exp not in EXP_OPTIONS:
+            current_exp = "3–6 years"
+        exp_input = st.selectbox(
+            "📅 Years of Experience",
+            options=EXP_OPTIONS,
+            index=EXP_OPTIONS.index(current_exp),
+            help="Used to filter out jobs too senior or too junior for you"
+        )
+    with exp_col2:
+        PREF_OPTIONS = ["🏙️ Local jobs in my city", "🌐 Remote jobs", "🔀 Both (local + remote)"]
+        current_pref = profile.get("job_preference", "🔀 Both (local + remote)") if profile else "🔀 Both (local + remote)"
+        if current_pref not in PREF_OPTIONS:
+            current_pref = "🔀 Both (local + remote)"
+        pref_input = st.selectbox(
+            "🎯 Job Preference",
+            options=PREF_OPTIONS,
+            index=PREF_OPTIONS.index(current_pref),
+            help="Focus search on local city jobs, remote-only, or both"
+        )
     
     if st.button("💾 Save Profile", use_container_width=True):
         skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
         if not skills_list and not name_input:
             st.error("⚠️ Please enter at least a name or some skills")
         else:
+            # Preserve fields from LLM parsing that user doesn't edit
+            existing = load_json(PROFILE_FILE) or {}
             updated_profile = {
                 "name": name_input or "Candidate",
                 "headline": headline_input,
                 "skills": skills_list,
                 "country": country_input,
                 "state": state_input,
+                "experience": exp_input,
+                "job_preference": pref_input,
+                # Preserve LLM-extracted fields
+                "industry": existing.get("industry", ""),
+                "search_terms": existing.get("search_terms", []),
             }
             save_json(PROFILE_FILE, updated_profile)
             st.success("✅ Profile saved!")

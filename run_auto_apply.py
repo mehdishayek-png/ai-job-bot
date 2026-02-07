@@ -91,6 +91,20 @@ def title_seniority(title):
 
 
 def estimate_years(profile):
+    """Get years of experience — prefer user-selected value, fallback to headline parsing."""
+    # User-selected experience (from dropdown)
+    exp_str = (profile.get("experience", "") or "").strip()
+    EXP_MAP = {
+        "0–1 years": 0, "0-1 years": 0,
+        "1–3 years": 2, "1-3 years": 2,
+        "3–6 years": 4, "3-6 years": 4,
+        "6–10 years": 7, "6-10 years": 7,
+        "10+ years": 12,
+    }
+    if exp_str in EXP_MAP:
+        return EXP_MAP[exp_str]
+
+    # Fallback: parse from headline
     headline = (profile.get("headline", "") or "").lower()
     m = re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
     if m:
@@ -303,6 +317,7 @@ def score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_year
 def llm_batch_score(batch, profile, candidate_years):
     skills_str = ", ".join(profile.get("skills", [])[:15])
     headline = profile.get("headline", "Professional")
+    industry = profile.get("industry", "")
     
     jobs_text = "\n\n".join([
         f"JOB {i+1}:\nTitle: {j.get('title', '?')}\nCompany: {j.get('company', '?')}\n"
@@ -310,22 +325,30 @@ def llm_batch_score(batch, profile, candidate_years):
         for i, j in enumerate(batch)
     ])
 
+    industry_note = f"\n- Industry: {industry}" if industry else ""
+
     prompt = f"""You are a job matching expert. Score these {len(batch)} jobs for this candidate.
 
 Candidate profile:
-- Headline: {headline}
+- Headline: {headline}{industry_note}
 - Skills: {skills_str}
 - Experience: ~{candidate_years} years
 
 Jobs to score:
 {jobs_text}
 
-For each job, provide a score 0-100 based on:
-- Skills match (50% weight)
-- Role fit (30% weight)
-- Seniority alignment (20% weight)
+SCORING RULES (0-100):
+- 80-100: Strong match — same industry, relevant title, skills overlap significantly
+- 60-79: Good match — related role, some skills overlap, could be a stretch but realistic
+- 40-59: Weak match — tangentially related, different industry or role type
+- 0-39: No match — completely different field, wrong seniority, or unrelated skills
 
-CRITICAL: Return ONLY a JSON array of {len(batch)} integers, nothing else.
+IMPORTANT:
+- A "{headline}" should NOT match "Software Engineer", "Data Engineer", "DevOps" roles unless the skills specifically align
+- Consider the candidate's INDUSTRY ({industry or 'general'}) — a fintech ops person should match fintech/payments jobs, not healthcare or construction
+- Score based on whether the candidate would ACTUALLY apply and be considered, not just keyword overlap
+
+Return ONLY a JSON array of {len(batch)} integers, nothing else.
 Example: [75, 60, 45, 90, ...]
 
 Scores:"""

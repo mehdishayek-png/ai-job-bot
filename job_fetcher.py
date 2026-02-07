@@ -313,73 +313,101 @@ def fetch_lever_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
 def build_serpapi_queries(profile: dict) -> list:
     """
     Generate targeted SerpAPI queries from user profile.
-    Uses profile['country'] and profile['state'] for location-focused searches.
+    Uses profile['search_terms'], 'country', 'state', and 'job_preference'.
     Returns max SERPAPI_MAX_QUERIES queries.
     """
     headline = (profile.get("headline", "") or "").strip()
     skills = profile.get("skills", [])
     country = (profile.get("country", "") or "India").strip()
     state = (profile.get("state", "") or "").strip()
+    search_terms = profile.get("search_terms", [])
+    industry = (profile.get("industry", "") or "").strip()
+    job_preference = (profile.get("job_preference", "") or "").strip()
 
-    # For "Remote Only", don't add location to searches
+    # Determine preference
+    prefer_local = "local" in job_preference.lower() or "city" in job_preference.lower()
+    prefer_remote = "remote" in job_preference.lower() and "both" not in job_preference.lower()
+    prefer_both = "both" in job_preference.lower() or (not prefer_local and not prefer_remote)
+
+    # For "Remote Only" country, always remote
     is_remote_only = country.lower() in ("remote only", "remote", "global", "")
+    if is_remote_only:
+        prefer_remote = True
+        prefer_local = False
+        prefer_both = False
+
     loc_tag = "" if is_remote_only else country
     serpapi_location = None if is_remote_only else country
 
-    # Extract city name from state (e.g. "Karnataka (Bangalore)" → "Bangalore")
+    # Extract city name from state
     city = ""
     if state and state != "Any":
         import re
         city_match = re.search(r'\(([^)]+)\)', state)
         if city_match:
-            city = city_match.group(1).split("/")[0].strip()  # Take first city if multiple
+            city = city_match.group(1).split("/")[0].strip()
         else:
-            city = state  # State IS the city (e.g. "Dubai", "London")
+            city = state
 
     queries = []
 
-    # Query 1: Headline + state/city (most targeted local search)
-    if headline and city:
-        queries.append({"q": f"{headline} jobs {city}", "location": serpapi_location})
+    # Use LLM-extracted search_terms first (these are the best queries)
+    for term in search_terms[:3]:
+        if prefer_local and city:
+            queries.append({"q": f"{term} {city}", "location": serpapi_location})
+        elif prefer_remote:
+            queries.append({"q": f"{term} remote"})
+        else:  # both
+            if city:
+                queries.append({"q": f"{term} {city}", "location": serpapi_location})
+            if len(queries) < SERPAPI_MAX_QUERIES:
+                queries.append({"q": f"{term} remote"})
 
-    # Query 2: Headline + country
-    if headline:
-        if loc_tag:
-            queries.append({"q": f"{headline} jobs {loc_tag}", "location": serpapi_location})
-        queries.append({"q": f"{headline} remote jobs"})
-
-    # Query 3-4: Multi-word skills
-    multi_word = [s for s in skills if " " in s and len(s) > 5][:2]
-    for skill in multi_word:
-        q = {"q": f"{skill} jobs"}
-        if loc_tag:
-            q["q"] = f"{skill} jobs {loc_tag}"
-            q["location"] = serpapi_location
-        queries.append(q)
-
-    # Query 5-6: Single-word skills
-    single_word = [s for s in skills if " " not in s and len(s) > 3][:2]
-    for skill in single_word:
-        q = {"q": f"{skill} remote jobs"}
-        if loc_tag:
-            q["q"] = f"{skill} jobs {loc_tag}"
-            q["location"] = serpapi_location
-        queries.append(q)
-
-    # Broader role search if room left
+    # If search_terms didn't fill up, use headline
     if len(queries) < SERPAPI_MAX_QUERIES and headline:
-        role_words = ["consultant", "analyst", "engineer", "developer", "specialist",
-                      "manager", "coordinator", "support", "associate", "executive"]
-        for word in role_words:
-            if word in headline.lower():
-                q = {"q": f"remote {word} hiring"}
-                if loc_tag:
-                    q["q"] = f"{word} jobs {loc_tag} hiring"
-                    q["location"] = serpapi_location
-                queries.append(q)
-                break
+        if prefer_local and city:
+            queries.append({"q": f"{headline} jobs {city}", "location": serpapi_location})
+        elif prefer_remote:
+            queries.append({"q": f"{headline} remote jobs"})
+        else:
+            if city and len(queries) < SERPAPI_MAX_QUERIES:
+                queries.append({"q": f"{headline} jobs {city}", "location": serpapi_location})
+            if loc_tag and len(queries) < SERPAPI_MAX_QUERIES:
+                queries.append({"q": f"{headline} jobs {loc_tag}", "location": serpapi_location})
 
-    return queries[:SERPAPI_MAX_QUERIES]
+    # If still room, add industry + location query
+    if len(queries) < SERPAPI_MAX_QUERIES and industry:
+        if city:
+            queries.append({"q": f"{industry} operations jobs {city}", "location": serpapi_location})
+        elif loc_tag:
+            queries.append({"q": f"{industry} jobs {loc_tag}", "location": serpapi_location})
+
+    # Fill remaining with skill-based queries
+    multi_word = [s for s in skills if " " in s and len(s) > 5][:3]
+    for skill in multi_word:
+        if len(queries) >= SERPAPI_MAX_QUERIES:
+            break
+        q = {"q": f"{skill} jobs"}
+        if prefer_local and city:
+            q["q"] = f"{skill} jobs {city}"
+            q["location"] = serpapi_location
+        elif loc_tag and not prefer_remote:
+            q["q"] = f"{skill} jobs {loc_tag}"
+            q["location"] = serpapi_location
+        else:
+            q["q"] = f"{skill} remote jobs"
+        queries.append(q)
+
+    # Deduplicate by query text
+    seen = set()
+    unique_queries = []
+    for q in queries:
+        key = q["q"].lower()
+        if key not in seen:
+            seen.add(key)
+            unique_queries.append(q)
+
+    return unique_queries[:SERPAPI_MAX_QUERIES]
 
 
 def fetch_serpapi_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> list:
