@@ -318,7 +318,8 @@ def build_serpapi_queries(profile: dict) -> list:
     """
     headline = (profile.get("headline", "") or "").strip()
     skills = profile.get("skills", [])
-    country = (profile.get("country", "") or "India").strip()
+    # Do not assume a default country; empty means unspecified
+    country = (profile.get("country", "") or "").strip()
     state = (profile.get("state", "") or "").strip()
     search_terms = profile.get("search_terms", [])
     industry = (profile.get("industry", "") or "").strip()
@@ -329,8 +330,9 @@ def build_serpapi_queries(profile: dict) -> list:
     prefer_remote = "remote" in job_preference.lower() and "both" not in job_preference.lower()
     prefer_both = "both" in job_preference.lower() or (not prefer_local and not prefer_remote)
 
-    # For "Remote Only" country, always remote
-    is_remote_only = country.lower() in ("remote only", "remote", "global", "")
+    # For explicit "remote" or "global" country values, treat as remote-only.
+    # Do NOT treat an empty/unspecified country as remote by default.
+    is_remote_only = country.lower() in ("remote only", "remote", "global")
     if is_remote_only:
         prefer_remote = True
         prefer_local = False

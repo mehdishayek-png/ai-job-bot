@@ -506,7 +506,10 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
 
         # Determine whether to prioritize local sources based on profile location preferences
         location_prefs = profile.get("location_preferences", ["global"])
-        prioritize_local = bool(location_prefs and location_prefs != ["global"])
+        # Prioritize local if user explicitly selected regions OR if user has a country/state set
+        has_country = bool((profile.get("country", "") or "").strip()) and (profile.get("country", "").strip().lower() not in ("remote only", "remote", "global"))
+        has_state = bool((profile.get("state", "") or "").strip() and profile.get("state", "") != "Any")
+        prioritize_local = bool((location_prefs and location_prefs != ["global"]) or has_country or has_state)
         if prioritize_local:
             logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
 
@@ -546,7 +549,38 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     # NEW: Filter by location preferences (Phase 1)
     # ============================================
     location_prefs = profile.get("location_preferences", ["global"])
-    
+
+    # If the user didn't explicitly select regions but has a country/state,
+    # derive a sensible region preference so we actually filter local jobs.
+    if (not location_prefs or location_prefs == ["global"]) and (user_country_lc or user_state):
+        COUNTRY_TO_REGION = {
+            "india": "asia",
+            "united states": "americas",
+            "usa": "americas",
+            "canada": "americas",
+            "united kingdom": "europe",
+            "uk": "europe",
+            "germany": "europe",
+            "australia": "asia",
+            "uae": "asia",
+            "saudi arabia": "asia",
+            "singapore": "asia",
+            "netherlands": "europe",
+            "france": "europe",
+            "ireland": "europe",
+        }
+        derived = None
+        if user_country_lc in COUNTRY_TO_REGION:
+            derived = COUNTRY_TO_REGION[user_country_lc]
+        else:
+            # try to infer from state/city
+            st_lc = user_state.lower() if user_state else ""
+            if "bengaluru" in st_lc or "bangalore" in st_lc or "india" in st_lc:
+                derived = "asia"
+        if derived:
+            location_prefs = [derived]
+            logger.info(f"Derived location_prefs from profile: {location_prefs}")
+
     # If user has location preferences, filter jobs
     if location_prefs and location_prefs != ["global"]:
         jobs_before = len(jobs)
