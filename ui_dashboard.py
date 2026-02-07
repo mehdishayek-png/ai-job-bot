@@ -395,6 +395,26 @@ section[data-testid="stSidebar"] {
     border-right: 1px solid #e8e8f0;
 }
 section[data-testid="stSidebar"] * { color: #3d3d56; }
+
+/* ============ STREAMLIT OVERRIDES ============ */
+/* Fix text colors in expanders, markdown, captions */
+.stMarkdown, .stMarkdown p, .stCaption, .stText { color: #3d3d56 !important; }
+.stAlert p { color: inherit !important; }
+label, .stSelectbox label, .stTextInput label, .stTextArea label { color: #3d3d56 !important; }
+
+/* Expander content readability */
+div[data-testid="stExpander"] details summary span { color: #1a1a2e !important; }
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #3d3d56 !important; }
+
+/* Progress bar */
+.stProgress > div > div > div { background: #6c5ce7 !important; }
+
+/* Links */
+a { color: #6c5ce7; }
+a:hover { color: #5b4bd5; }
+
+/* Code blocks in progress */
+.stCodeBlock, pre { background: #f8f8fc !important; color: #3d3d56 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -406,8 +426,6 @@ load_dotenv()
 
 # ============================================
 # MODULE RELOAD — Critical for Streamlit hot-reload
-# Without this, Streamlit caches old module versions
-# and new code (like Lever/SerpAPI) never runs
 # ============================================
 import importlib
 import sys
@@ -420,12 +438,12 @@ _modules_to_reload = [
     "cover_letter_generator",
 ]
 for _mod in _modules_to_reload:
-    try:
-        if _mod in sys.modules:
+    if _mod in sys.modules:
+        try:
             importlib.reload(sys.modules[_mod])
-    except Exception:
-        # First load or dependency not ready — safe to skip
-        pass
+        except Exception:
+            # Remove corrupted module so fresh import works
+            sys.modules.pop(_mod, None)
 
 # Import functions from other modules
 try:
@@ -434,7 +452,7 @@ try:
     from run_auto_apply import run_auto_apply_pipeline
     from cover_letter_generator import generate_cover_letter
     from location_utils import get_all_regions, get_region_display_name
-except ImportError as e:
+except (ImportError, KeyError) as e:
     st.error(f"Missing required module: {e}. Please ensure all files are in the same directory.")
     st.stop()
 
@@ -1081,6 +1099,29 @@ if isinstance(matches_data, list) and matches_data:
             with col1:
                 st.markdown(f"**{title}**")
                 st.markdown(f"🏢 **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
+                
+                # Job location and experience info
+                job_location = job.get("location", "")
+                if not job_location:
+                    # Try to extract from summary or other fields
+                    for tag in job.get("location_tags", []):
+                        if tag:
+                            job_location = tag
+                            break
+                
+                info_parts = []
+                if job_location:
+                    info_parts.append(f"📍 {job_location}")
+                # Try to extract experience from summary
+                import re as _re
+                exp_match = _re.search(r'(\d+)\+?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)?', 
+                                       job.get("summary", "").lower())
+                if exp_match:
+                    info_parts.append(f"📅 {exp_match.group(0).strip()}")
+                
+                if info_parts:
+                    st.caption(" · ".join(info_parts))
+                
                 if summary:
                     st.write(summary)
             
