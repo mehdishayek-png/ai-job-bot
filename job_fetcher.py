@@ -315,11 +315,6 @@ def build_serpapi_queries(profile: dict) -> list:
     Generate targeted SerpAPI queries from user profile.
     Uses profile['country'] and profile['state'] for location-focused searches.
     Returns max SERPAPI_MAX_QUERIES queries.
-    
-    Strategy: 
-    - CITY FIRST if available (most targeted, highest relevance)
-    - Then country-wide searches
-    - Mix of headline + skills for comprehensive coverage
     """
     headline = (profile.get("headline", "") or "").strip()
     skills = profile.get("skills", [])
@@ -343,55 +338,46 @@ def build_serpapi_queries(profile: dict) -> list:
 
     queries = []
 
-    # PRIORITY 1: Headline + CITY (most targeted, highest local relevance)
+    # Query 1: Headline + state/city (most targeted local search)
     if headline and city:
         queries.append({"q": f"{headline} jobs {city}", "location": serpapi_location})
-    
-    # PRIORITY 2: Headline + country (broader reach)
-    if headline and loc_tag:
-        queries.append({"q": f"{headline} jobs {loc_tag}", "location": serpapi_location})
-    
-    # PRIORITY 3: Headline + remote (global remote roles)
+
+    # Query 2: Headline + country
     if headline:
+        if loc_tag:
+            queries.append({"q": f"{headline} jobs {loc_tag}", "location": serpapi_location})
         queries.append({"q": f"{headline} remote jobs"})
 
-    # PRIORITY 4: Top skill + city (if city available, highly targeted)
-    if city and skills:
-        top_skill = None
-        # Prefer multi-word skills (more specific)
-        multi_word = [s for s in skills if " " in s and len(s) > 5]
-        if multi_word:
-            top_skill = multi_word[0]
-        else:
-            # Fall back to single-word
-            single_word = [s for s in skills if len(s) > 3]
-            if single_word:
-                top_skill = single_word[0]
-        
-        if top_skill:
-            queries.append({"q": f"{top_skill} jobs {city}", "location": serpapi_location})
-
-    # PRIORITY 5: Skills + country
-    remaining_slots = SERPAPI_MAX_QUERIES - len(queries)
-    multi_word = [s for s in skills if " " in s and len(s) > 5][:remaining_slots]
+    # Query 3-4: Multi-word skills
+    multi_word = [s for s in skills if " " in s and len(s) > 5][:2]
     for skill in multi_word:
-        if len(queries) >= SERPAPI_MAX_QUERIES:
-            break
+        q = {"q": f"{skill} jobs"}
         if loc_tag:
-            queries.append({"q": f"{skill} jobs {loc_tag}", "location": serpapi_location})
-        else:
-            queries.append({"q": f"{skill} jobs"})
+            q["q"] = f"{skill} jobs {loc_tag}"
+            q["location"] = serpapi_location
+        queries.append(q)
 
-    # PRIORITY 6: More skills if room
-    if len(queries) < SERPAPI_MAX_QUERIES:
-        single_word = [s for s in skills if " " not in s and len(s) > 3][:SERPAPI_MAX_QUERIES - len(queries)]
-        for skill in single_word:
-            if len(queries) >= SERPAPI_MAX_QUERIES:
+    # Query 5-6: Single-word skills
+    single_word = [s for s in skills if " " not in s and len(s) > 3][:2]
+    for skill in single_word:
+        q = {"q": f"{skill} remote jobs"}
+        if loc_tag:
+            q["q"] = f"{skill} jobs {loc_tag}"
+            q["location"] = serpapi_location
+        queries.append(q)
+
+    # Broader role search if room left
+    if len(queries) < SERPAPI_MAX_QUERIES and headline:
+        role_words = ["consultant", "analyst", "engineer", "developer", "specialist",
+                      "manager", "coordinator", "support", "associate", "executive"]
+        for word in role_words:
+            if word in headline.lower():
+                q = {"q": f"remote {word} hiring"}
+                if loc_tag:
+                    q["q"] = f"{word} jobs {loc_tag} hiring"
+                    q["location"] = serpapi_location
+                queries.append(q)
                 break
-            if loc_tag:
-                queries.append({"q": f"{skill} jobs {loc_tag}", "location": serpapi_location})
-            else:
-                queries.append({"q": f"{skill} remote jobs"})
 
     return queries[:SERPAPI_MAX_QUERIES]
 
