@@ -221,51 +221,93 @@ code, .stCode, pre {
 .skills-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
+    gap: 0.65rem;
+    margin-top: 1rem;
+    padding: 0.75rem 0;
 }
 
 .skill-chip {
-    background: #f0edff;
-    border: 1px solid #e0dcf5;
-    color: #6c5ce7;
-    padding: 0.4rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.82rem;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
     font-weight: 600;
+    display: inline-block;
+    backdrop-filter: blur(10px);
+    border: 1px solid;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+/* Color variation for skills - rotate through different colors */
+.skill-chip:nth-child(4n+1) {
+    background: rgba(108, 92, 231, 0.12);
+    color: #5a4b9a;
+    border-color: rgba(108, 92, 231, 0.3);
+}
+
+.skill-chip:nth-child(4n+2) {
+    background: rgba(5, 150, 105, 0.12);
+    color: #047857;
+    border-color: rgba(5, 150, 105, 0.3);
+}
+
+.skill-chip:nth-child(4n+3) {
+    background: rgba(217, 119, 6, 0.12);
+    color: #b45309;
+    border-color: rgba(217, 119, 6, 0.3);
+}
+
+.skill-chip:nth-child(4n+4) {
+    background: rgba(30, 58, 138, 0.12);
+    color: #1e3a8a;
+    border-color: rgba(30, 58, 138, 0.3);
+}
+
+.skill-chip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.15);
 }
 
 /* ============ STATS ============ */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    margin: 1.5rem 0;
+    gap: 1.25rem;
+    margin: 2rem 0;
+    padding: 0.5rem 0;
 }
 
 .stat-card {
-    background: #fff;
-    border: 1px solid #e8e8f0;
-    border-radius: 14px;
-    padding: 1.25rem 1rem;
+    background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,248,255,0.95) 100%);
+    border: 1.5px solid rgba(224, 220, 245, 0.6);
+    border-radius: 16px;
+    padding: 1.5rem 1.25rem;
     text-align: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 16px rgba(108,92,231,0.08);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+    border-color: #d0cfe8;
+    box-shadow: 0 8px 24px rgba(108,92,231,0.12);
+    transform: translateY(-2px);
 }
 
 .stat-value {
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: 800;
     color: #6c5ce7;
     line-height: 1;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.5rem;
 }
 
 .stat-label {
     color: #8888a0;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
 }
 
 /* ============ SCORE BADGES ============ */
@@ -367,21 +409,69 @@ code, .stCode, pre {
 
 /* ============ EXPANDERS (job cards) ============ */
 .streamlit-expanderHeader {
-    background: #fff !important;
-    border: 1px solid #e8e8f0 !important;
+    background: linear-gradient(135deg, #ffffff 0%, #f9f8ff 100%) !important;
+    border: 1.5px solid #e0dcf5 !important;
     border-radius: 12px !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
     color: #1a1a2e !important;
+    padding: 1rem 1.25rem !important;
+    margin-bottom: 0.5rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.streamlit-expanderHeader:hover {
+    border-color: #d0cfe8 !important;
+    box-shadow: 0 4px 16px rgba(108,92,231,0.1) !important;
+}
+
+/* When expander is open, ensure content has proper spacing */
+div[data-testid="stExpander"] {
+    margin-bottom: 1.5rem !important;
+}
+
+div[data-testid="stExpander"] > div:last-child {
+    padding: 1.25rem 1.5rem !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,248,255,0.95) 100%) !important;
+    border: 1px solid #e8e8f0 !important;
+    border-top: none !important;
+    border-radius: 0 0 12px 12px !important;
+    backdrop-filter: blur(10px) !important;
 }
 
 /* ============ INPUTS ============ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div {
-    background: #fff !important;
-    border: 1px solid #e0e0ea !important;
-    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1.5px solid rgba(224, 224, 234, 0.6) !important;
+    border-radius: 12px !important;
     color: #1a1a2e !important;
+    font-size: 0.95rem !important;
+    padding: 0.75rem 1rem !important;
+    transition: all 0.3s ease !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stSelectbox > div > div:focus {
+    border-color: #d0cfe8 !important;
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.stTextInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder {
+    color: #b0b0c0 !important;
+}
+
+/* Enhance label styling */
+.stTextInput > label,
+.stTextArea > label,
+.stSelectbox > label {
+    font-weight: 600 !important;
+    color: #3d3d56 !important;
+    margin-bottom: 0.5rem !important;
 }
 
 /* ============ DIVIDER ============ */
@@ -393,21 +483,49 @@ code, .stCode, pre {
 
 /* ============ COVER LETTER ============ */
 .cover-letter-box {
-    background: #f8f8fc;
-    border: 1px solid #e8e8f0;
-    border-radius: 10px;
-    padding: 1.25rem;
-    margin-top: 0.75rem;
+    background: linear-gradient(135deg, rgba(248, 248, 252, 0.8) 0%, rgba(240, 237, 255, 0.8) 100%);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(224, 220, 245, 0.6);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-top: 1rem;
     color: #3d3d56;
-    line-height: 1.7;
-    font-size: 0.9rem;
+    line-height: 1.8;
+    font-size: 0.95rem;
+    box-shadow: 0 8px 32px rgba(108, 92, 231, 0.08);
 }
 
 .cover-letter-label {
     color: #6c5ce7;
-    font-weight: 600;
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+/* ============ COLUMNS & LAYOUT IMPROVEMENTS ============ */
+/* Ensure column spacing and proper alignment */
+div[data-testid="column"] {
+    padding: 0.5rem !important;
+    gap: 1rem !important;
+}
+
+/* Improve job card layout - right column spacing */
+div[data-testid="column"]:last-child {
+    min-width: 140px !important;
+}
+
+/* Ensure buttons in columns are readable */
+div[data-testid="column"] .stButton > button {
+    width: 100% !important;
+    margin-bottom: 0.75rem !important;
+}
+
+/* Markdown text readability in columns */
+div[data-testid="column"] .stMarkdown {
+    color: #1a1a2e !important;
+    line-height: 1.6 !important;
 }
 
 /* ============ SCROLLBAR ============ */
@@ -450,16 +568,29 @@ div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: 
 .stCodeBlock, pre, code { 
     background: linear-gradient(135deg, #f0edff 0%, #eef2ff 100%) !important; 
     color: #3d3d56 !important;
-    border: 1px solid #e0dcf5 !important;
-    border-radius: 8px !important;
-    font-family: 'DM Sans', monospace !important;
-    padding: 0.75rem 1rem !important;
+    border: 1.5px solid rgba(224, 220, 245, 0.6) !important;
+    border-radius: 10px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    padding: 1rem 1.25rem !important;
+    backdrop-filter: blur(10px) !important;
 }
 
 /* Progress bar with gradient matching hero */
 .stProgress > div > div > div { 
     background: linear-gradient(135deg, #6c5ce7 0%, #74b9ff 100%) !important; 
     border-radius: 10px !important;
+}
+
+/* Container for progress and status messages */
+.stSpinner,
+div[class*="Progress"],
+div[class*="progress"] {
+    margin-bottom: 1.5rem !important;
+}
+
+/* Ensure proper spacing for overlapping elements */
+.element-container {
+    margin-bottom: 1rem !important;
 }
 
 /* Links */
@@ -471,6 +602,16 @@ a:hover { color: #5b4bd5; text-decoration: underline; }
     border-radius: 12px !important;
     border-left: 4px solid #6c5ce7 !important;
     font-family: 'DM Sans', sans-serif !important;
+    background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(249,248,255,0.95) 100%) !important;
+    backdrop-filter: blur(10px) !important;
+    padding: 1.25rem 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+    box-shadow: 0 4px 16px rgba(108, 92, 231, 0.08) !important;
+}
+
+.stAlert p {
+    color: #3d3d56 !important;
+    line-height: 1.6 !important;
 }
 
 /* ENSURE DM SANS EVERYWHERE - override Streamlit defaults */
