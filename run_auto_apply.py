@@ -59,11 +59,11 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # Falls back to mistral if gemini fails
 MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "100"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
-MATCH_THRESHOLD = 25      # LOWERED: Was 35, reduced until SerperDev/RSS fixes boost job count
+MATCH_THRESHOLD = 35      # Local score threshold — be generous, let LLM decide
 MAX_PER_COMPANY = 3       # Company diversity cap
 
 
@@ -497,13 +497,12 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
         if progress_callback:
-            progress_callback("Fetching jobs from all sources (including Google Jobs via SerperDev, Lever)...")
-        from job_fetcher import fetch_all, build_serper_queries_from_profile
+            progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
+        from job_fetcher import fetch_all, build_serpapi_queries
 
-        # Generate profile-based SerperDev queries for targeted search
-        # With 2500 searches/month, we can be more comprehensive
-        serper_queries, location = build_serper_queries_from_profile(profile)
-        logger.info(f"SerperDev queries: {serper_queries}")
+        # Generate profile-based SerpAPI queries for India-focused search
+        serpapi_queries = build_serpapi_queries(profile)
+        logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
 
         # Determine whether to prioritize local sources based on profile location preferences
         location_prefs = profile.get("location_preferences", ["global"])
@@ -512,9 +511,9 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         has_state = bool((profile.get("state", "") or "").strip() and profile.get("state", "") != "Any")
         prioritize_local = bool((location_prefs and location_prefs != ["global"]) or has_country or has_state)
         if prioritize_local:
-            logger.info("Profile requests local prioritization — prioritizing SerperDev/Lever over large remote boards")
+            logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
 
-        fetch_all(output_path=jobs_file, serper_queries=serper_queries, prioritize_local=prioritize_local, location=location)
+        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
