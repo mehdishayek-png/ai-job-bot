@@ -49,11 +49,7 @@ def load_api_key(key_name):
 
 # Load all API keys
 SERPER_API_KEY = load_api_key("SERPER_API_KEY")
-
-# JSearch uses RapidAPI - try both key names for compatibility
 JSEARCH_API_KEY = load_api_key("JSEARCH_API_KEY") or load_api_key("RAPIDAPI_KEY")
-
-# SerpAPI - try both with and without _API suffix
 SERPAPI_API_KEY = load_api_key("SERPAPI_API_KEY") or load_api_key("SERPAPI_KEY")
 
 # Log which keys are available
@@ -368,102 +364,14 @@ def build_queries_from_profile(profile: dict) -> tuple:
 # ============================================
 
 def fetch_serperdev_jobs(queries: list, location: str = None) -> list:
-    """Fetch jobs from SerperDev /jobs endpoint"""
-    # NOTE: Serper.dev free tier doesn't support /jobs endpoint
-    # This endpoint requires a paid plan. Disabling to avoid 404 errors.
-    # Use the search_orchestrator.py upgrade for proper Serper integration.
+    """Fetch jobs from SerperDev /jobs endpoint
+    
+    NOTE: Serper.dev free tier doesn't support /jobs endpoint.
+    The /jobs endpoint requires a paid plan ($50+/month).
+    Use search_orchestrator.py from the v2.0 upgrade for proper Serper integration.
+    """
     logger.info("SerperDev: Skipping (free tier doesn't support /jobs endpoint)")
     return []
-    
-    # ORIGINAL CODE DISABLED BELOW:
-    """
-    if not SERPER_API_KEY:
-        logger.warning("SerperDev: No API key found")
-        return []
-
-    if not queries:
-        return []
-
-    queries = queries[:SERPER_QUERIES]
-    logger.info(f"SerperDev: Fetching {len(queries)} queries (location: {location or 'India'})")
-
-    jobs = []
-    seen_urls = set()
-
-    for query in queries:
-        try:
-            logger.info(f"SerperDev: '{query}'")
-
-            url = "https://google.serper.dev/jobs"
-            payload = {
-                "q": query,
-                "location": location or "India",
-                "num": 50,
-            }
-            headers = {
-                'X-API-KEY': SERPER_API_KEY,
-                'Content-Type': 'application/json'
-            }
-
-            response = requests.post(url, json=payload, headers=headers, timeout=20)
-
-            if response.status_code in [429, 403]:
-                logger.warning(f"SerperDev: HTTP {response.status_code}")
-                break
-
-            response.raise_for_status()
-            data = response.json()
-
-            for result in data.get("jobs", []):
-                try:
-                    title = result.get("title", "").strip()
-                    
-                    company_raw = result.get("company", "Unknown")
-                    if isinstance(company_raw, dict):
-                        company = company_raw.get("name", "Unknown")
-                    else:
-                        company = str(company_raw) if company_raw else "Unknown"
-
-                    description = result.get("description", "").strip()
-                    link = result.get("link", "").strip()
-                    job_location = result.get("location", "")
-
-                    if not title or not link or link in seen_urls:
-                        continue
-                    seen_urls.add(link)
-
-                    # Determine source from URL
-                    source = "Google Jobs"
-                    link_lower = link.lower()
-                    if "linkedin.com" in link_lower:
-                        source = "LinkedIn"
-                    elif "naukri.com" in link_lower:
-                        source = "Naukri"
-                    elif "indeed.com" in link_lower:
-                        source = "Indeed"
-
-                    job = {
-                        "title": title,
-                        "company": company,
-                        "summary": strip_html(description[:500]),
-                        "apply_url": link,
-                        "source": source,
-                        "location": job_location,
-                    }
-                    job["location_tags"] = extract_location_from_job(job)
-                    jobs.append(job)
-
-                except Exception:
-                    continue
-
-            time.sleep(0.5)
-
-        except Exception as e:
-            logger.warning(f"SerperDev error for '{query}': {e}")
-
-    logger.info(f"SerperDev: {len(jobs)} jobs fetched")
-    return jobs
-
 
 # ============================================
 # JSEARCH (RAPIDAPI)
