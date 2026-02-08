@@ -225,7 +225,8 @@ with col1:
                 st.error(f"Error reading PDF: {e}")
 
             if raw_text:
-                profile = build_profile(raw_text)
+                profile = build_profile(raw_text, PF)
+                # build_profile will save when output path provided; still ensure saved
                 save_j(PF, profile)
                 st.success("Resume parsed!")
                 st.rerun()
@@ -273,7 +274,21 @@ with col2:
             with st.status("Running Job Hunt Pipeline...", expanded=True) as status:
                 st.write("🔍 fetching jobs from all sources...")
                 try:
-                    run_auto_apply_pipeline(SID)
+                    def _progress(msg):
+                        try:
+                            status.write(msg)
+                        except Exception:
+                            pass
+
+                    run_auto_apply_pipeline(
+                        profile_file=PF,
+                        jobs_file=JF,
+                        matches_file=MF,
+                        cache_file=CF,
+                        log_file=LF,
+                        letters_dir=LD,
+                        progress_callback=_progress,
+                    )
                     status.update(label="Pipeline Complete!", state="complete", expanded=False)
                     st.rerun()
                 except Exception as e:
