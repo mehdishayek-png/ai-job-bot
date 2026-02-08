@@ -43,22 +43,18 @@ def extract_text(pdf_path):
 
 def extract_name(lines):
     """Extract name from first few lines of resume"""
-    # Look in first 5 lines for a name-like pattern
     for line in lines[:5]:
         line = line.strip()
         if not line or len(line) < 3:
             continue
             
-        # Skip lines with common resume keywords
         skip_keywords = ['resume', 'cv', 'curriculum', 'vitae', 'contact', 
                         'email', 'phone', 'address', '@', 'http', 'www']
         if any(kw in line.lower() for kw in skip_keywords):
             continue
             
-        # Check if it looks like a name (2-4 words, mostly alphabetic)
         words = line.split()
         if 2 <= len(words) <= 4:
-            # Allow hyphens and apostrophes in names
             if all(re.match(r"^[A-Za-z\-']+$", w) for w in words):
                 return line.title()
     
@@ -67,22 +63,17 @@ def extract_name(lines):
 
 def extract_headline(lines):
     """Extract professional headline from resume"""
-    # Look for headline in lines 2-10
     for i, line in enumerate(lines[1:10], 1):
         line = line.strip()
         
-        # Skip contact info
         if "@" in line or "http" in line.lower() or "www" in line.lower():
             continue
         
-        # Skip the name line if we can identify it
         if i == 0:
             continue
             
-        # Look for title-like patterns (3-15 words)
         words = line.split()
         if 3 <= len(words) <= 15:
-            # Should contain some common job title indicators
             title_indicators = ['manager', 'engineer', 'developer', 'analyst', 
                               'specialist', 'consultant', 'director', 'lead',
                               'coordinator', 'associate', 'success', 'support',
@@ -91,57 +82,35 @@ def extract_headline(lines):
             if any(indicator in line.lower() for indicator in title_indicators):
                 return line.strip()
             
-            # If it has pipes or bullets, it might be a headline
             if '|' in line or '•' in line or '-' in line:
                 return line.strip()
     
     return ""
 
 # =========================
-# LLM-BASED EXTRACTION (MORE RELIABLE)
+# LLM-BASED EXTRACTION
 # =========================
 
 def extract_profile_with_llm(text):
-    """Use LLM to extract name, headline, skills, and search terms in one call"""
+    """Use LLM to extract name, headline, and skills in one call"""
     
     prompt = f"""Extract the following from this resume and return ONLY valid JSON:
 
 1. name: Full name of the candidate
-2. headline: Current job title or professional headline (e.g. "Business Operations Lead" or "IT Consultant")
-3. skills: List of 12-20 SPECIFIC, SEARCHABLE professional skills that a recruiter would use as keywords
-4. industry: The primary industry/domain (e.g. "fintech", "e-commerce", "healthcare", "SaaS")
-5. search_terms: 5-8 job title variations this person would search for on job boards
+2. headline: Current job title or professional headline
+3. skills: List of SPECIFIC, MATCHABLE professional skills
 
-SKILLS RULES — read carefully:
-- Extract DOMAIN-SPECIFIC skills, NOT generic ones
-- GOOD examples: "payment gateway integration", "UPI services", "merchant onboarding", "digital payments", "fintech operations", "loyalty programs", "gift card management", "prepaid cards", "BBPS", "order fulfillment", "vendor management"
-- BAD examples: "ai modules", "api mappings", "aeps", "modules" (too vague/niche to match job postings)
-- Include specific tools/platforms: "Salesforce", "JIRA", "SAP", "REST API"
-- Include specific methodologies: "Agile", "process automation", "reconciliation"
-- DO NOT include soft skills: "communication", "leadership", "problem solving", "teamwork"
-- DO NOT include generic office tools: "Microsoft Office", "Excel", "PowerPoint", "Word"
-- DO NOT include languages spoken
-- Each skill should realistically appear in a job posting the candidate would apply to
-- IMPORTANT: Aim for 12-20 skills (was 8-15). More keywords = better job matching!
-- If in doubt, include it — better to have more keywords for matching
-
-SKILLS EXTRACTION STRATEGY:
-- Start with obvious domain skills (e.g., "Salesforce", "JIRA", "payment processing")
-- Add functional skills (e.g., "vendor management", "process automation")
-- Include industry-specific skills (e.g., "fintech operations", "SaaS")
-- Add soft skills only if highly relevant (e.g., "stakeholder management" for leadership roles)
-- Aim for variety: tools + domains + methodologies + platforms
-- Extract both specific (e.g., "UPI integration") and general (e.g., "payments") terms
-
-SEARCH_TERMS RULES:
-- These are job TITLES the person would search for, not skills
-- Think: what would this person type into LinkedIn/Indeed/Naukri?
-- GOOD: ["Business Operations Manager", "Fintech Operations Lead", "Payment Operations Manager", "Operations Manager fintech"]
-- BAD: ["API integration jobs", "lead jobs"] (too vague)
-- IMPORTANT: Provide 5-8 variations (was 3-5) to maximize job discovery
+SKILLS RULES:
+- Include specific tools: "Oracle OMS", "Zendesk", "JIRA", "Salesforce", "SQL"
+- Include domains: "order management", "marketplace integration"  
+- Include methodologies: "ITIL", "Agile", "SLA management"
+- Include technologies: "SOA Suite", "REST API", "SOAP", "Linux"
+- NO soft skills like "communication", "leadership"
+- NO generic terms like "Microsoft Office"
+- NO languages like "English", "Hindi"
 
 Return ONLY a JSON object:
-{{"name": "...", "headline": "...", "skills": [...], "industry": "...", "search_terms": [...]}}
+{{"name": "...", "headline": "...", "skills": ["skill1", "skill2", ...]}}
 
 Resume text:
 {text[:6000]}
@@ -153,46 +122,31 @@ JSON:"""
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=600,
+            max_tokens=500,
         )
 
         response_text = res.choices[0].message.content.strip()
         
-        # Clean up markdown code blocks if present
         if response_text.startswith("```"):
             response_text = re.sub(r'^```(?:json)?\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
         
         profile_data = json.loads(response_text)
         
-        # Validate structure
         if not isinstance(profile_data, dict):
             raise ValueError("Response is not a dictionary")
         
-        # Ensure required keys exist
         profile_data.setdefault("name", "Candidate")
         profile_data.setdefault("headline", "")
         profile_data.setdefault("skills", [])
-        profile_data.setdefault("industry", "")
-        profile_data.setdefault("search_terms", [])
         
-        # Ensure skills is a list
         if not isinstance(profile_data["skills"], list):
             profile_data["skills"] = []
         
-        # Clean up skills
         profile_data["skills"] = sorted(set([
             s.strip().lower() for s in profile_data["skills"] 
             if isinstance(s, str) and s.strip()
         ]))
-        
-        # Clean search_terms
-        if not isinstance(profile_data["search_terms"], list):
-            profile_data["search_terms"] = []
-        profile_data["search_terms"] = [
-            s.strip() for s in profile_data["search_terms"]
-            if isinstance(s, str) and s.strip()
-        ][:5]
         
         return profile_data
 
@@ -209,7 +163,7 @@ def extract_skills_llm(text):
 Rules:
 - Return JSON array only
 - No duplicates
-- Include tools, domains, programming languages, frameworks, soft skills
+- Include tools, domains, programming languages, frameworks
 
 Resume:
 {text[:6000]}
@@ -227,7 +181,6 @@ Return format: ["skill1", "skill2", ...]
 
         response_text = res.choices[0].message.content.strip()
         
-        # Clean up markdown code blocks if present
         if response_text.startswith("```"):
             response_text = re.sub(r'^```(?:json)?\n?', '', response_text)
             response_text = re.sub(r'\n?```$', '', response_text)
@@ -237,7 +190,6 @@ Return format: ["skill1", "skill2", ...]
         if not isinstance(skills, list):
             return []
             
-        # Clean and deduplicate
         return sorted(set([
             s.strip().lower() for s in skills 
             if isinstance(s, str) and s.strip()
@@ -248,30 +200,42 @@ Return format: ["skill1", "skill2", ...]
         return []
 
 # =========================
-# MAIN BUILDER
+# MAIN BUILDER - FIXED VERSION
 # =========================
 
-def build_profile(pdf_path, output_path):
+def build_profile(input_data, output_path=None):
     """
-    Extract profile from PDF resume and save to JSON.
+    Extract profile from PDF resume or raw text and optionally save to JSON.
+    
+    Args:
+        input_data: Either a PDF file path (str) or raw text (str) from resume
+        output_path: Optional path to save JSON profile. If None, profile is not saved.
+    
+    Returns:
+        dict: Profile containing name, headline, and skills
+    
     Uses both rule-based and LLM-based extraction for best results.
     """
     
-    # Extract text
-    raw_text = extract_text(pdf_path)
+    # Determine if input is a file path or raw text
+    if os.path.isfile(input_data):
+        # It's a PDF file path
+        raw_text = extract_text(input_data)
+    else:
+        # It's raw text
+        raw_text = input_data
+    
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     
     if not lines:
-        raise ValueError("Could not extract any text from PDF")
+        raise ValueError("Could not extract any text from input")
     
-    # Try LLM-based extraction first (most reliable)
+    # Try LLM-based extraction first
     profile = extract_profile_with_llm(raw_text)
     
     if profile:
-        # LLM extraction succeeded
         print(f"✓ LLM extraction: name={profile.get('name')}, skills={len(profile.get('skills', []))}")
     else:
-        # Fall back to rule-based extraction
         print("⚠ LLM extraction failed, using rule-based fallback")
         
         name = extract_name(lines)
@@ -291,23 +255,21 @@ def build_profile(pdf_path, output_path):
     if not profile.get("skills") or len(profile["skills"]) == 0:
         raise ValueError("Could not extract any skills from resume. Please try a different resume or enter skills manually.")
     
-    # Save to file
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    # Save to file only if output_path is provided
+    if output_path:
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(profile, f, indent=2, ensure_ascii=False)
+        
+        print(f"✓ Profile saved: {output_path}")
     
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(profile, f, indent=2, ensure_ascii=False)
-    
-    print(f"✓ Profile saved: {output_path}")
     print(f"  Name: {profile['name']}")
     print(f"  Headline: {profile.get('headline', 'N/A')}")
     print(f"  Skills: {len(profile['skills'])}")
     
     return profile
 
-
-# =========================
-# CLI TEST
-# =========================
 
 if __name__ == "__main__":
     import sys
