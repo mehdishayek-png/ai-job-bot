@@ -97,7 +97,9 @@ LEVER_COMPANIES = [
 ]
 LEVER_PER_COMPANY = 20
 
-SERPER_MAX_QUERIES = 10  # Limit for API usage
+SERPER_MAX_QUERIES = 12  # Limit for API usage (we'll split between SerpAPI and JSearch)
+# SerpAPI (https://serpapi.com) API key
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
 
 # Export for run_auto_apply.py
 __all__ = ['fetch_all', 'build_serper_queries_from_profile', 'SERPER_MAX_QUERIES']
@@ -339,7 +341,7 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
 
     return unique_queries[:SERPER_MAX_QUERIES], location
 
-def fetch_jsearch_jobs(queries: list = None, location: str = None) -> list:
+def fetch_jsearch_jobs(queries: list = None, location: str = None, max_queries: int = 6) -> list:
     """
     Fetch jobs from Google Jobs, LinkedIn, Indeed, Glassdoor via JSearch API (RapidAPI).
     This is the RELIABLE way to get aggregated jobs (SerperDev doesn't support this well).
@@ -362,8 +364,8 @@ def fetch_jsearch_jobs(queries: list = None, location: str = None) -> list:
         query_strings = queries
 
     # RapidAPI Free Tier = 100 requests/month. 
-    # We limit to 5 queries per run to be safe.
-    query_strings = query_strings[:5]
+    # Limit queries per run (default 6)
+    query_strings = query_strings[:max_queries]
 
     logger.info(f"JSearch: Fetching jobs for {len(query_strings)} queries (location: {location or 'India'})")
 
@@ -480,6 +482,100 @@ def fetch_jsearch_jobs(queries: list = None, location: str = None) -> list:
     logger.info(f"JSearch total: {len(jobs)} unique jobs")
     return jobs
 
+
+def fetch_serpapi_jobs(queries: list = None, location: str = None, max_queries: int = 6) -> list:
+    """
+    Fetch jobs using SerpAPI (serpapi.com). Sends up to `max_queries` searches.
+    """
+    if not SERPAPI_API_KEY:
+        logger.warning("SerpAPI: No API key found (add SERPAPI_API_KEY to .env or secrets), skipping")
+        return []
+
+    if not queries:
+        logger.warning("SerpAPI: No queries provided")
+        return []
+
+    query_strings = []
+    if isinstance(queries, list) and queries and isinstance(queries[0], dict):
+        query_strings = [q.get("q", "") for q in queries if q.get("q")]
+    else:
+        query_strings = list(queries)
+
+    query_strings = query_strings[:max_queries]
+    logger.info(f"SerpAPI: Fetching jobs for {len(query_strings)} queries (location: {location or 'India'})")
+
+    jobs = []
+    seen_urls = set()
+
+    base_url = "https://serpapi.com/search.json"
+
+    for query in query_strings:
+        try:
+            qstr = f"{query} in {location or 'India'}"
+            logger.info(f"SerpAPI: '{query}' in {location or 'India'}")
+            params = {
+                "engine": "google_jobs",
+                "q": qstr,
+                "api_key": SERPAPI_API_KEY,
+                "hl": "en",
+            }
+
+            resp = requests.get(base_url, params=params, timeout=NETWORK_TIMEOUT)
+            if resp.status_code == 429:
+                logger.warning("SerpAPI: Rate limit hit")
+                break
+            resp.raise_for_status()
+            data = resp.json()
+
+            # SerpAPI may return job results in 'jobs_results' or 'jobs' or 'organic_results'
+            job_results = data.get('jobs_results') or data.get('jobs') or data.get('organic_results') or []
+
+            added = 0
+            for result in job_results:
+                try:
+                    title = result.get('title') or result.get('job_title') or result.get('position') or ''
+                    company = (result.get('company_name') or result.get('company') or result.get('employer')) or 'Unknown'
+                    description = result.get('description') or result.get('snippet') or ''
+                    link = result.get('link') or result.get('url') or result.get('job_link') or ''
+                    loc = result.get('location') or result.get('formatted_location') or ''
+                    posted_date = result.get('posted') or result.get('date_posted') or result.get('posted_date') or ''
+
+                    if not title or not link:
+                        continue
+
+                    if link in seen_urls:
+                        continue
+                    seen_urls.add(link)
+
+                    job = {
+                        'title': title.strip(),
+                        'company': company.strip(),
+                        'summary': strip_html((description or '')[:500]).strip(),
+                        'apply_url': link.strip(),
+                        'source': 'SerpAPI',
+                        'location': loc,
+                        'posted_date': posted_date,
+                    }
+                    job['location_tags'] = extract_location_from_job(job)
+                    jobs.append(job)
+                    added += 1
+                except Exception as e:
+                    logger.debug(f"SerpAPI: Error parsing result: {e}")
+                    continue
+
+            logger.info(f"SerpAPI: '{query}' → {added} jobs")
+            time.sleep(1)
+
+        except requests.Timeout:
+            logger.warning(f"SerpAPI: Timeout for '{query}'")
+        except requests.RequestException as e:
+            logger.warning(f"SerpAPI: Request failed: {e}")
+        except Exception as e:
+            logger.error(f"SerpAPI: Unexpected error: {e}")
+
+    logger.info(f"SerpAPI total: {len(jobs)} unique jobs")
+    return jobs
+
 # ============================================
 # FETCH ALL
 # ============================================
@@ -497,14 +593,28 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
     if prioritize_local:
         logger.info("Prioritizing local sources first, then fetching global sources")
 
-    # Layer 1: JSearch (The RELIABLE Google Jobs/LinkedIn aggregator)
-    # This replaces the broken SerperDev implementation
+    # Layer 1: JSearch + SerpAPI (targeted localized searches)
+    # We split the profile queries so each API gets up to 6 searches.
     try:
-        # Note: We pass serper_queries here as they are just list of strings/dicts
-        jobs = fetch_jsearch_jobs(queries=serper_queries, location=location)
-        all_jobs.extend(jobs)
+        if serper_queries:
+            q_list = list(serper_queries)
+            first = q_list[:6]
+            second = q_list[6:12]
+            # If we don't have a second group, reuse the first to increase coverage
+            if not second:
+                second = first
+
+            # Run JSearch on the first group, SerpAPI on the second group
+            logger.info(f"Running JSearch for {len(first)} queries and SerpAPI for {len(second)} queries")
+            jobs_j = fetch_jsearch_jobs(queries=first, location=location, max_queries=6)
+            jobs_s = fetch_serpapi_jobs(queries=second, location=location, max_queries=6)
+            all_jobs.extend(jobs_j)
+            all_jobs.extend(jobs_s)
+        else:
+            jobs = fetch_jsearch_jobs(queries=serper_queries, location=location)
+            all_jobs.extend(jobs)
     except Exception as e:
-        logger.error(f"Failed to fetch JSearch: {e}")
+        logger.error(f"Failed to fetch JSearch/SerpAPI: {e}")
 
     # Layer 2: Lever (tech companies)
     try:

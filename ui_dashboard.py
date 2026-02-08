@@ -244,6 +244,26 @@ code, .stCode, pre {
     color: #1a1a2e !important;
 }
 
+/* Make native selects and dropdowns readable */
+select, option, .stSelectbox select, .stSelectbox option, .stApp select {
+    background: #ffffff !important;
+    color: #1a1a2e !important;
+}
+
+/* Ensure the 'Browse files' button in uploader is light by default */
+.stFileUploader section button,
+.stFileUploader section div[role="button"],
+.stFileUploader button {
+    background: #ffffff !important;
+    color: #1a1a2e !important;
+    border: 1px solid #e0e0ea !important;
+}
+.stFileUploader section button:hover,
+.stFileUploader section div[role="button"]:hover,
+.stFileUploader button:hover {
+    background: #f6f6fb !important;
+}
+
 /* ============ PROFILE BOX ============ */
 .profile-box {
     background: #fff;
