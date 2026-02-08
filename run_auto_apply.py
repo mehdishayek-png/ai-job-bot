@@ -497,12 +497,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
         if progress_callback:
-            progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
-        from job_fetcher import fetch_all, build_serpapi_queries
+            progress_callback("Fetching jobs from all sources (including Google Jobs via SerperDev, Lever)...")
+        from job_fetcher import fetch_all, build_serper_queries_from_profile
 
-        # Generate profile-based SerpAPI queries for India-focused search
-        serpapi_queries = build_serpapi_queries(profile)
-        logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
+        # Generate profile-based SerperDev queries for targeted search
+        # With 2500 searches/month, we can be more comprehensive
+        serper_queries, location = build_serper_queries_from_profile(profile)
+        logger.info(f"SerperDev queries: {serper_queries}")
 
         # Determine whether to prioritize local sources based on profile location preferences
         location_prefs = profile.get("location_preferences", ["global"])
@@ -511,9 +512,9 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         has_state = bool((profile.get("state", "") or "").strip() and profile.get("state", "") != "Any")
         prioritize_local = bool((location_prefs and location_prefs != ["global"]) or has_country or has_state)
         if prioritize_local:
-            logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
+            logger.info("Profile requests local prioritization — prioritizing SerperDev/Lever over large remote boards")
 
-        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
+        fetch_all(output_path=jobs_file, serper_queries=serper_queries, prioritize_local=prioritize_local, location=location)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
