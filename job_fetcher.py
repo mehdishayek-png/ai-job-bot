@@ -99,6 +99,8 @@ WWR_FEEDS = [
 
 REMOTEOK = "https://remoteok.com/remote-jobs.rss"
 JOBICY = "https://jobicy.com/feed/"
+HIMALAYAS = "https://himalayas.app/jobs/rss"  # ~100 recent jobs, high quality, remote-friendly
+ADZUNA_INDIA = "https://www.adzuna.in/rss"  # India-focused job aggregator
 
 LEVER_COMPANIES = [
     "razorpay", "postman", "hasura", "chargebee",
@@ -698,6 +700,20 @@ def fetch_all(output_path: str = None, profile: dict = None,
         all_jobs.extend(jobs)
     except Exception as e:
         logger.error(f"Jobicy failed: {e}")
+
+    # Himalayas - high quality remote jobs, always fetch
+    try:
+        jobs = parse_rss(HIMALAYAS, "Himalayas")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Himalayas failed: {e}")
+    
+    # Adzuna India - India-focused aggregator, always fetch for local jobs
+    try:
+        jobs = parse_rss(ADZUNA_INDIA, "Adzuna India")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Adzuna India failed: {e}")
 
     # Error check
     if not all_jobs:

@@ -59,9 +59,9 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # Falls back to mistral if gemini fails
 MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "30"))  # Increased to 30 as requested
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
-MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
+MAX_LLM_CANDIDATES = 60  # Increased to 60 to support more matches
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
 MATCH_THRESHOLD = 25      # Lower threshold - was too aggressive at 35
 MAX_PER_COMPANY = 3       # Company diversity cap
@@ -829,7 +829,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         
         # Calculate 10% cap on remote jobs
         target_total = min(MAX_MATCHES, len(matches))
-        max_remote = max(2, int(target_total * 0.1))  # At least 2 remote jobs, max 10%
+        max_remote = max(3, int(target_total * 0.1))  # At least 3 remote jobs, max 10%
         
         # Rebalance: prioritize local jobs
         rebalanced = local_matches[:target_total - max_remote] + remote_matches[:max_remote]
