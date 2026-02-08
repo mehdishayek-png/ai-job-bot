@@ -13,37 +13,37 @@ from dotenv import load_dotenv
 # ============================================
 
 st.set_page_config(
-    page_title="JobBot · AI-Powered Job Matching",
+    page_title="Job AI Search · Powered by AI",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================
-# CUSTOM CSS — Modern Professional Design with Logo-Inspired Colors
+# CUSTOM CSS — Matching Design Image
 # ============================================
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 /* ============ GLOBAL ============ */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 .stApp {
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: linear-gradient(180deg, #f8f9fc 0%, #ffffff 100%);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #F7FAFC;
 }
 
 h1, h2, h3, h4, h5, h6,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    font-family: 'DM Sans', sans-serif !important;
+    font-family: 'Inter', sans-serif !important;
     font-weight: 700 !important;
-    letter-spacing: -0.03em;
-    color: #1a1f36 !important;
+    letter-spacing: -0.02em;
+    color: #1A202C !important;
 }
 
-p, li, span, div { color: #3d3d56; }
+p, li, span, div { color: #4A5568; }
 
 code, .stCode, pre {
     font-family: 'JetBrains Mono', monospace !important;
@@ -51,13 +51,13 @@ code, .stCode, pre {
 
 /* ============ HERO SECTION ============ */
 .hero {
-    background: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%);
+    background: linear-gradient(135deg, #5B8DEF 0%, #5DD3D4 100%);
     border-radius: 24px;
     padding: 3rem 2.5rem;
-    margin-bottom: 2rem;
+    margin-bottom: 2.5rem;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 40px rgba(91, 134, 229, 0.3);
+    box-shadow: 0 10px 40px rgba(91, 141, 239, 0.2);
 }
 
 .hero::before {
@@ -67,14 +67,8 @@ code, .stCode, pre {
     right: -10%;
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
     filter: blur(60px);
-    animation: float 6s ease-in-out infinite;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
 }
 
 .hero-content { 
@@ -83,17 +77,19 @@ code, .stCode, pre {
 }
 
 .hero h1 {
-    color: #ffffff !important;
-    font-size: 2.75rem !important;
-    font-weight: 800 !important;
-    margin: 0 0 0.5rem 0 !important;
-    line-height: 1.1;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    color: #FFFFFF !important;
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    margin: 0 0 0.75rem 0 !important;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .hero-subtitle {
     color: rgba(255,255,255,0.95);
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     margin: 0 0 1.5rem 0;
     font-weight: 400;
     line-height: 1.6;
@@ -103,24 +99,17 @@ code, .stCode, pre {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-    margin-top: 1.25rem;
 }
 
 .hero-tag {
-    background: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.2);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.35);
-    color: #fff;
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #FFFFFF;
     padding: 0.5rem 1rem;
-    border-radius: 12px;
+    border-radius: 20px;
     font-size: 0.85rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.hero-tag:hover {
-    background: rgba(255,255,255,0.35);
-    transform: translateY(-2px);
+    font-weight: 500;
 }
 
 /* ============ STEPPER ============ */
@@ -128,115 +117,100 @@ code, .stCode, pre {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    margin: 2rem 0 2.5rem;
-    padding: 1.5rem;
-    background: #ffffff;
-    border: 1px solid #e8ebf0;
-    border-radius: 20px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    gap: 0rem;
+    margin: 2rem auto 2.5rem;
+    padding: 1.5rem 2rem;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    max-width: 800px;
 }
 
 .step {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem 1.25rem;
-    border-radius: 12px;
-    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
-    color: #6c6c8a;
-    transition: all 0.3s ease;
+    color: #718096;
+    flex: 1;
+    justify-content: center;
 }
 
 .step-icon {
-    width: 36px; 
-    height: 36px;
+    width: 40px; 
+    height: 40px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
+    font-size: 1rem;
+    font-weight: 700;
+    flex-shrink: 0;
 }
 
-.step.done { color: #10b981; }
 .step.done .step-icon {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    background: #5B8DEF;
+    color: #FFFFFF;
 }
 
-.step.active {
-    color: #5B86E5;
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+.step.done {
+    color: #2D3748;
 }
 
 .step.active .step-icon {
-    background: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%);
-    color: #fff;
-    box-shadow: 0 4px 15px rgba(91, 134, 229, 0.4);
-    animation: pulse 2s ease-in-out infinite;
+    background: #5B8DEF;
+    color: #FFFFFF;
 }
 
-.step.pending { color: #c0c0d0; }
+.step.active {
+    color: #2D3748;
+}
+
 .step.pending .step-icon {
-    background: #f5f6f8;
-    border: 2px dashed #d5d7dd;
+    background: #EDF2F7;
+    color: #A0AEC0;
+    border: 2px solid #E2E8F0;
 }
 
 .step-connector {
-    width: 50px; 
-    height: 3px;
-    background: linear-gradient(90deg, #e0e2ea 0%, #d0d2dd 100%);
-    border-radius: 2px;
-}
-
-@keyframes pulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 4px 15px rgba(91, 134, 229, 0.4); }
-    50% { transform: scale(1.1); box-shadow: 0 6px 20px rgba(91, 134, 229, 0.6); }
+    width: 80px; 
+    height: 2px;
+    background: #E2E8F0;
+    flex-shrink: 0;
 }
 
 /* ============ CARDS ============ */
 .glass-card {
-    background: #ffffff;
-    border: 1px solid #e8ebf0;
-    border-radius: 20px;
-    padding: 2rem;
-    margin-bottom: 1.5rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.glass-card:hover {
-    border-color: #5B86E5;
-    box-shadow: 0 8px 30px rgba(91, 134, 229, 0.12);
-    transform: translateY(-2px);
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .card-header {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
 }
 
 .card-icon {
-    width: 48px; 
-    height: 48px;
-    border-radius: 14px;
+    width: 36px; 
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-    border: 1px solid #dde6f5;
+    font-size: 1.25rem;
 }
 
 .card-title {
-    font-size: 1.3rem !important;
-    font-weight: 700 !important;
-    color: #1a1f36 !important;
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    color: #1A202C !important;
     margin: 0 !important;
 }
 
@@ -244,26 +218,18 @@ code, .stCode, pre {
 .skills-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.6rem;
+    gap: 0.5rem;
     margin-top: 1rem;
 }
 
 .skill-chip {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-    border: 1px solid #dde6f5;
-    color: #5B86E5;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
+    background: #EDF2F7;
+    border: 1px solid #E2E8F0;
+    color: #2D3748;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
     font-size: 0.85rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.skill-chip:hover {
-    background: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%);
-    color: #ffffff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(91, 134, 229, 0.3);
+    font-weight: 500;
 }
 
 /* ============ STATS ============ */
@@ -275,36 +241,26 @@ code, .stCode, pre {
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 100%);
-    border: 1px solid #e8ebf0;
-    border-radius: 18px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
     padding: 1.75rem 1.25rem;
     text-align: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    border-color: #5B86E5;
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(91, 134, 229, 0.15);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
 .stat-value {
     font-size: 2.25rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-weight: 700;
+    color: #5B8DEF;
     line-height: 1;
     margin-bottom: 0.5rem;
 }
 
 .stat-label {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #6c6c8a;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #718096;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -320,26 +276,26 @@ code, .stCode, pre {
 }
 
 .score-excellent {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #48BB78 0%, #38A169 100%);
+    color: #FFFFFF;
 }
 
 .score-good {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #ED8936 0%, #DD6B20 100%);
+    color: #FFFFFF;
 }
 
 .score-fair {
-    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #667EEA 0%, #5A67D8 100%);
+    color: #FFFFFF;
 }
 
 /* ============ SOURCE BADGE ============ */
 .source-badge {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-    color: #5B86E5;
+    background: #EDF2F7;
+    color: #5B8DEF;
     padding: 0.3rem 0.75rem;
-    border-radius: 8px;
+    border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -350,44 +306,100 @@ code, .stCode, pre {
 .cover-letter-label {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #1a1f36;
+    color: #1A202C;
     margin: 1.5rem 0 1rem;
 }
 
 .cover-letter-box {
-    background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
-    border: 2px solid #e8ebf0;
-    border-radius: 16px;
+    background: #F7FAFC;
+    border: 2px solid #E2E8F0;
+    border-radius: 12px;
     padding: 1.75rem;
     margin: 1rem 0;
     line-height: 1.8;
-    color: #3d3d56;
+    color: #4A5568;
     font-size: 0.95rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+/* ============ INPUTS - DARK THEME MATCHING DESIGN ============ */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea {
+    background: #2D3748 !important;
+    border: 1px solid #2D3748 !important;
+    border-radius: 8px !important;
+    color: #FFFFFF !important;
+    font-size: 0.95rem !important;
+    padding: 0.75rem 1rem !important;
+}
+
+.stTextInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder {
+    color: #A0AEC0 !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: #5B8DEF !important;
+    box-shadow: 0 0 0 1px #5B8DEF !important;
+}
+
+/* Input labels */
+.stTextInput label,
+.stTextArea label,
+.stSelectbox label,
+.stFileUploader label {
+    color: #4A5568 !important;
+    font-weight: 500 !important;
+    font-size: 0.9rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+/* Select boxes */
+.stSelectbox > div > div {
+    background: #2D3748 !important;
+    border: 1px solid #2D3748 !important;
+    border-radius: 8px !important;
+}
+
+.stSelectbox > div > div > select,
+.stSelectbox > div > div > div {
+    color: #FFFFFF !important;
+    background: #2D3748 !important;
 }
 
 /* ============ BUTTONS ============ */
 .stButton > button {
-    border-radius: 12px !important;
+    border-radius: 8px !important;
     font-weight: 600 !important;
-    transition: all 0.3s ease !important;
+    transition: all 0.2s ease !important;
     border: none !important;
+    padding: 0.75rem 1.5rem !important;
+    font-size: 0.95rem !important;
 }
 
 .stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #5B86E5 0%, #36D1DC 100%) !important;
-    box-shadow: 0 4px 15px rgba(91, 134, 229, 0.3) !important;
+    background: #5B8DEF !important;
+    color: #FFFFFF !important;
 }
 
 .stButton > button[kind="primary"]:hover {
-    box-shadow: 0 6px 20px rgba(91, 134, 229, 0.4) !important;
-    transform: translateY(-2px) !important;
+    background: #4A7BD8 !important;
+}
+
+.stButton > button:not([kind="primary"]) {
+    background: #FFFFFF !important;
+    color: #5B8DEF !important;
+    border: 1px solid #5B8DEF !important;
+}
+
+.stButton > button:not([kind="primary"]):hover {
+    background: #EDF2F7 !important;
 }
 
 /* ============ DIVIDER ============ */
 .divider {
     height: 2px;
-    background: linear-gradient(90deg, transparent 0%, #e8ebf0 20%, #e8ebf0 80%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, #E2E8F0 20%, #E2E8F0 80%, transparent 100%);
     margin: 3rem 0;
 }
 
@@ -396,78 +408,180 @@ code, .stCode, pre {
     margin-top: 4rem;
     padding: 2rem;
     text-align: center;
-    color: #6c6c8a;
+    color: #718096;
     font-size: 0.9rem;
-    border-top: 1px solid #e8ebf0;
-    background: linear-gradient(180deg, #ffffff 0%, #f8f9fc 100%);
-    border-radius: 20px 20px 0 0;
+    border-top: 1px solid #E2E8F0;
+    background: #FFFFFF;
 }
 
 .footer a {
-    color: #5B86E5;
+    color: #5B8DEF;
     text-decoration: none;
     font-weight: 600;
-    transition: all 0.3s ease;
 }
 
 .footer a:hover {
-    color: #36D1DC;
+    color: #4A7BD8;
     text-decoration: underline;
 }
 
 /* ============ STREAMLIT OVERRIDES ============ */
 .stExpander {
-    border: 1px solid #e8ebf0 !important;
-    border-radius: 16px !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
     overflow: hidden !important;
     margin-bottom: 1rem !important;
-    transition: all 0.3s ease !important;
+    background: #FFFFFF !important;
 }
 
-.stExpander:hover {
-    border-color: #5B86E5 !important;
-    box-shadow: 0 4px 20px rgba(91, 134, 229, 0.1) !important;
-}
-
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea,
-.stSelectbox > div > div > select {
+/* File uploader */
+.stFileUploader > div {
+    background: #F7FAFC !important;
+    border: 2px dashed #CBD5E0 !important;
     border-radius: 12px !important;
-    border: 1px solid #e8ebf0 !important;
+    padding: 2rem !important;
 }
 
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus,
-.stSelectbox > div > div > select:focus {
-    border-color: #5B86E5 !important;
-    box-shadow: 0 0 0 3px rgba(91, 134, 229, 0.1) !important;
+.stFileUploader label {
+    color: #4A5568 !important;
 }
 
-/* ============ PROGRESS BAR ============ */
+/* Progress bar */
 .stProgress > div > div {
-    background: linear-gradient(90deg, #5B86E5 0%, #36D1DC 100%) !important;
+    background: linear-gradient(90deg, #5B8DEF 0%, #5DD3D4 100%) !important;
     border-radius: 10px !important;
 }
+
+/* Download button */
+.stDownloadButton > button {
+    background: #48BB78 !important;
+    color: #FFFFFF !important;
+}
+
+.stDownloadButton > button:hover {
+    background: #38A169 !important;
+}
+
+/* Captions */
+.stCaption {
+    color: #718096 !important;
+    font-size: 0.875rem !important;
+}
+
+/* Link button */
+.stLinkButton > a {
+    background: #5B8DEF !important;
+    color: #FFFFFF !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1.5rem !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    display: inline-block !important;
+}
+
+.stLinkButton > a:hover {
+    background: #4A7BD8 !important;
+}
+
+/* Markdown and text colors */
+.stMarkdown, .stMarkdown p, .stText { color: #4A5568 !important; }
+.stAlert p { color: inherit !important; }
+
+/* Expander content readability */
+div[data-testid="stExpander"] details summary span { color: #1A202C !important; }
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #4A5568 !important; }
+
+/* Code blocks */
+.stCodeBlock, pre { background: #F7FAFC !important; color: #4A5568 !important; }
+
+/* Links */
+a { color: #5B8DEF; }
+a:hover { color: #4A7BD8; }
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+}
+section[data-testid="stSidebar"] * { color: #4A5568; }
 </style>
 """, unsafe_allow_html=True)
 
+""", unsafe_allow_html=True)
+
 # ============================================
-# HELPER FUNCTIONS
+# IMPORTS & SETUP
+# ============================================
+
+load_dotenv()
+
+# ============================================
+# MODULE RELOAD — Critical for Streamlit hot-reload
+# ============================================
+import importlib
+import sys
+
+_modules_to_reload = [
+    "location_utils",
+    "job_fetcher",
+    "resume_parser",
+    "run_auto_apply",
+    "cover_letter_generator",
+]
+for _mod in _modules_to_reload:
+    if _mod in sys.modules:
+        try:
+            importlib.reload(sys.modules[_mod])
+        except Exception:
+            # Remove corrupted module so fresh import works
+            sys.modules.pop(_mod, None)
+
+# Import functions from other modules
+try:
+    from job_fetcher import fetch_all
+    from resume_parser import build_profile
+    from run_auto_apply import run_auto_apply_pipeline
+    from cover_letter_generator import generate_cover_letter
+    from location_utils import get_all_regions, get_region_display_name
+except (ImportError, KeyError) as e:
+    st.error(f"Missing required module: {e}. Please ensure all files are in the same directory.")
+    st.stop()
+
+# ============================================
+# SESSION MANAGEMENT
+# ============================================
+
+if "session_id" not in st.session_state:
+    st.session_state["session_id"] = str(uuid.uuid4())[:8]
+
+SESSION_ID = st.session_state["session_id"]
+DATA_DIR = f"data/session_{SESSION_ID}"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+PROFILE_FILE = os.path.join(DATA_DIR, "profile.json")
+JOBS_FILE = os.path.join(DATA_DIR, "jobs.json")
+MATCHES_FILE = os.path.join(DATA_DIR, "matches.json")
+CACHE_FILE = os.path.join(DATA_DIR, "semantic_cache.json")
+LOG_FILE = os.path.join(DATA_DIR, "pipeline.log")
+LETTERS_DIR = os.path.join(DATA_DIR, "cover_letters")
+
+# ============================================
+# UTILITY FUNCTIONS
 # ============================================
 
 def load_json(filepath):
-    """Load JSON file or return empty dict/list"""
+    """Load JSON file safely"""
     if not os.path.exists(filepath):
-        return {}
+        return None
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
-        return {}
+    except Exception:
+        return None
 
 def save_json(filepath, data):
-    """Save data to JSON file"""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    """Save JSON file safely"""
+    os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -475,83 +589,86 @@ def strip_html(text):
     """Remove HTML tags from text"""
     if not text:
         return ""
-    return re.sub(r'<[^>]+>', '', text)
+    clean = re.sub(r'<[^>]+>', ' ', text)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
 
-def build_zip(folder_path):
-    """Create ZIP file from folder contents"""
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for filename in os.listdir(folder_path):
-            filepath = os.path.join(folder_path, filename)
-            if os.path.isfile(filepath):
-                zf.write(filepath, filename)
-    zip_buffer.seek(0)
-    return zip_buffer.getvalue()
+def build_zip(letters_dir):
+    """Create a ZIP file of all cover letters"""
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for fname in os.listdir(letters_dir):
+            if fname.endswith(".txt"):
+                fpath = os.path.join(letters_dir, fname)
+                zipf.write(fpath, fname)
+    zip_buf.seek(0)
+    return zip_buf.getvalue()
 
 def find_cover_letter(company, title):
-    """Find cover letter file for company/title"""
+    """Find cover letter file for a job"""
     if not os.path.exists(LETTERS_DIR):
         return None, None
     
-    # Try exact match first
-    safe_company = re.sub(r'[^\w\s-]', '', company).strip().replace(' ', '_')
-    safe_title = re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')
-    filename = f"{safe_company}_{safe_title}.txt"
-    filepath = os.path.join(LETTERS_DIR, filename)
+    # Sanitize search terms
+    company_clean = re.sub(r'[^a-zA-Z0-9_\-]', '', company.replace(' ', '_'))
+    title_clean = re.sub(r'[^a-zA-Z0-9_\-]', '', title.replace(' ', '_'))
     
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return f.read(), filename
-    
-    # Try partial matches
+    # Try to find matching file
     for fname in os.listdir(LETTERS_DIR):
-        if fname.endswith('.txt'):
-            if safe_company.lower() in fname.lower() and safe_title.lower() in fname.lower():
-                filepath = os.path.join(LETTERS_DIR, fname)
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    return f.read(), fname
-    
+        if fname.endswith(".txt"):
+            fname_lower = fname.lower()
+            if company_clean.lower() in fname_lower or title_clean.lower() in fname_lower:
+                fpath = os.path.join(LETTERS_DIR, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        return f.read(), fname
+                except Exception:
+                    pass
     return None, None
 
 # ============================================
-# FILE PATHS
+# SIDEBAR - SESSION CONTROL
 # ============================================
 
-load_dotenv()
-
-# Use current directory or specify your paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROFILE_FILE = os.path.join(BASE_DIR, "profile.json")
-JOBS_FILE = os.path.join(BASE_DIR, "jobs.json")
-MATCHES_FILE = os.path.join(BASE_DIR, "matches.json")
-CACHE_FILE = os.path.join(BASE_DIR, "cache.json")
-LOG_FILE = os.path.join(BASE_DIR, "logs.txt")
-LETTERS_DIR = os.path.join(BASE_DIR, "cover_letters")
-
-# Import pipeline function (adjust import based on your structure)
-try:
-    from run_auto_apply import run_auto_apply_pipeline
-except ImportError:
-    def run_auto_apply_pipeline(*args, **kwargs):
-        return {"status": "error", "message": "Pipeline not found"}
-
-try:
-    from cover_letter_generator import generate_cover_letter
-except ImportError:
-    def generate_cover_letter(*args, **kwargs):
-        pass
+with st.sidebar:
+    st.markdown("### 🎯 Session Control")
+    st.caption(f"Session ID: `{SESSION_ID}`")
+    
+    if st.button("🔄 Start Fresh Session", use_container_width=True):
+        # Clear session state
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+    
+    st.markdown("---")
+    st.markdown("### 📊 About JobBot")
+    st.markdown("""
+    **How it works:**
+    1. **Skills-based matching** - Extracts skills from your resume
+    2. **Keyword filtering** - Finds relevant jobs (300+ sources)
+    3. **AI ranking** - Gemini scores top candidates
+    4. **Smart matching** - Considers seniority & diversity
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 🔍 Job Sources")
+    st.markdown("""
+    - WeWorkRemotely (6 categories)
+    - RemoteOK
+    - Jobicy
+    - Remotive
+    """)
 
 # ============================================
 # HERO SECTION
 # ============================================
 
-st.markdown(f"""
+st.markdown("""
 <div class="hero">
     <div class="hero-content">
         <h1>🚀 Job AI Search</h1>
         <p class="hero-subtitle">
-            Intelligent job matching powered by AI. Upload your resume, set your preferences, 
-            and discover opportunities tailored specifically for you.
+            Intelligent job matching powered by AI. Upload your resume, set your preferences, and discover opportunities tailored specifically for you.
         </p>
         <div class="hero-tags">
             <span class="hero-tag">🔍 6 Job Sources</span>
@@ -564,130 +681,331 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ============================================
-# STEPPER / PROGRESS INDICATOR
+# PROGRESS STEPPER
 # ============================================
 
 profile = load_json(PROFILE_FILE)
 matches = load_json(MATCHES_FILE)
 
-step_states = []
-if not profile or not profile.get("skills"):
-    step_states = ["active", "pending", "pending"]
-elif not matches or not isinstance(matches, list) or len(matches) == 0:
-    step_states = ["done", "active", "pending"]
-else:
-    step_states = ["done", "done", "active"]
+step1_status = "done" if profile and profile.get("skills") else "active"
+step2_status = "done" if matches else ("active" if step1_status == "done" else "pending")
+step3_status = "done" if os.path.exists(LETTERS_DIR) and os.listdir(LETTERS_DIR) else ("active" if step2_status == "done" else "pending")
 
 st.markdown(f"""
 <div class="stepper">
-    <div class="step {step_states[0]}">
-        <div class="step-icon">{"✓" if step_states[0] == "done" else "1"}</div>
+    <div class="step {step1_status}">
+        <div class="step-icon">1</div>
         <span>Your Profile</span>
     </div>
     <div class="step-connector"></div>
-    <div class="step {step_states[1]}">
-        <div class="step-icon">{"✓" if step_states[1] == "done" else "2"}</div>
+    <div class="step {step2_status}">
+        <div class="step-icon">2</div>
         <span>Job Matching</span>
     </div>
     <div class="step-connector"></div>
-    <div class="step {step_states[2]}">
-        <div class="step-icon">{"✓" if step_states[2] == "done" else "3"}</div>
+    <div class="step {step3_status}">
+        <div class="step-icon">3</div>
         <span>Results</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 # ============================================
-# STEP 1: PROFILE INPUT
+# STEP 1: RESUME UPLOAD & PROFILE
 # ============================================
 
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown(f"""
+st.markdown("""
 <div class="card-header">
     <div class="card-icon">👤</div>
     <h2 class="card-title">Step 1: Build Your Profile</h2>
 </div>
 """, unsafe_allow_html=True)
 
-profile_data = profile if isinstance(profile, dict) else {}
+col1, col2 = st.columns([2, 1])
 
-with st.form("profile_form"):
-    name = st.text_input("Full Name", value=profile_data.get("name", ""), placeholder="John Doe")
-    email = st.text_input("Email", value=profile_data.get("email", ""), placeholder="john@example.com")
-    phone = st.text_input("Phone", value=profile_data.get("phone", ""), placeholder="+1 234 567 8900")
+with col1:
+    uploaded_resume = st.file_uploader(
+        "Upload your resume (PDF)",
+        type=["pdf"],
+        help="We'll extract your skills, experience, and headline automatically",
+        key="resume_upload"
+    )
+
+with col2:
+    if uploaded_resume:
+        if st.button("🔍 Parse Resume", type="primary", use_container_width=True):
+            with st.spinner("Analyzing your resume..."):
+                try:
+                    # Save uploaded file
+                    resume_path = os.path.join(DATA_DIR, "resume.pdf")
+                    with open(resume_path, "wb") as f:
+                        f.write(uploaded_resume.getbuffer())
+                    
+                    # Parse resume
+                    # Preserve user settings from existing profile
+                    existing = load_json(PROFILE_FILE)
+                    
+                    profile = build_profile(resume_path, PROFILE_FILE)
+                    
+                    # Re-add user-set fields that the parser doesn't know about
+                    if existing:
+                        for field in ["country", "state", "experience", "job_preference"]:
+                            if field not in profile and field in existing:
+                                profile[field] = existing[field]
+                        # Set defaults if first time
+                        profile.setdefault("country", "India")
+                        profile.setdefault("state", "Any")
+                        profile.setdefault("experience", "3–6 years")
+                        profile.setdefault("job_preference", "🔀 Both (local + remote)")
+                        save_json(PROFILE_FILE, profile)
+                    
+                    st.success("✅ Resume parsed successfully!")
+                    time.sleep(0.5)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"❌ Error parsing resume: {e}")
+
+# Display current profile
+profile = load_json(PROFILE_FILE)
+
+if profile and profile.get("skills"):
+    st.markdown("---")
+    st.markdown(f"**👤 {profile.get('name', 'Candidate')}**")
+    if profile.get('headline'):
+        st.caption(profile['headline'])
     
-    col1, col2 = st.columns(2)
-    with col1:
-        country = st.text_input("Country", value=profile_data.get("country", ""), placeholder="USA")
-    with col2:
-        city = st.text_input("City", value=profile_data.get("city", ""), placeholder="San Francisco")
-    
+    skills = profile.get("skills", [])
+    if skills:
+        skills_html = "".join([f'<span class="skill-chip">{s}</span>' for s in skills])
+        st.markdown(f'<div class="skills-container">{skills_html}</div>', unsafe_allow_html=True)
+        st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
+
+    # Display location preferences
+    country = profile.get("country", "")
+    state = profile.get("state", "")
+    if country:
+        loc_display = country
+        if state and state != "Any":
+            loc_display += f" · {state}"
+        st.caption(f"📍 {loc_display}")
+    if profile.get("location_preferences"):
+        prefs = profile["location_preferences"]
+        pref_names = []
+        name_map = {"americas": "Americas", "europe": "Europe", "asia": "Asia-Pacific", "global": "Global"}
+        for p in prefs:
+            pref_names.append(name_map.get(p, p.title()))
+        st.caption(f"📍 Regions: {', '.join(pref_names)}")
+else:
+    st.info("👆 Upload your resume to get started, or create a profile manually below")
+
+# Manual profile editing
+with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create Profile Manually"):
+    name_input = st.text_input("Full Name", value=profile.get("name", "") if profile else "")
+    headline_input = st.text_input("Professional Headline", value=profile.get("headline", "") if profile else "")
     skills_input = st.text_area(
-        "Skills (comma-separated)", 
-        value=", ".join(profile_data.get("skills", [])),
-        placeholder="Python, Machine Learning, Data Science, SQL",
-        height=100
+        "Skills (one per line)", 
+        value="\n".join(profile.get("skills", [])) if profile else "",
+        height=150,
+        help="Enter specific skills, tools, and technologies - these are used for matching"
     )
-    
-    experience = st.text_area(
-        "Experience Summary", 
-        value=profile_data.get("experience", ""),
-        placeholder="Describe your work experience...",
-        height=150
-    )
-    
-    preferences = st.text_area(
-        "Job Preferences", 
-        value=profile_data.get("preferences", ""),
-        placeholder="Remote work, flexible hours, startup culture...",
-        height=100
-    )
-    
-    submit_profile = st.form_submit_button("💾 Save Profile", type="primary", use_container_width=True)
-    
-    if submit_profile:
-        skills_list = [s.strip() for s in skills_input.split(",") if s.strip()]
-        new_profile = {
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "country": country,
-            "city": city,
-            "skills": skills_list,
-            "experience": experience,
-            "preferences": preferences,
-        }
-        save_json(PROFILE_FILE, new_profile)
-        st.success("✅ Profile saved successfully!")
-        time.sleep(0.5)
-        st.rerun()
 
-# Display current skills
-if profile_data.get("skills"):
-    st.markdown("**Current Skills:**")
-    skills_html = '<div class="skills-container">' + ''.join([
-        f'<span class="skill-chip">{skill}</span>' 
-        for skill in profile_data.get("skills", [])
-    ]) + '</div>'
-    st.markdown(skills_html, unsafe_allow_html=True)
+    # Location selectors — country + state/city
+    COUNTRY_OPTIONS = [
+        "India", "United States", "United Kingdom", "Canada", "Germany",
+        "Australia", "UAE", "Saudi Arabia", "Singapore", "Netherlands",
+        "France", "Ireland", "Israel", "Brazil", "Remote Only",
+    ]
+    STATE_OPTIONS = {
+        "India": [
+            "Any", "Karnataka (Bangalore)", "Maharashtra (Mumbai/Pune)", "Delhi NCR",
+            "Telangana (Hyderabad)", "Tamil Nadu (Chennai)", "West Bengal (Kolkata)",
+            "Gujarat (Ahmedabad)", "Rajasthan (Jaipur)", "Uttar Pradesh (Noida/Lucknow)",
+            "Kerala (Kochi)", "Haryana (Gurgaon)",
+        ],
+        "United States": [
+            "Any", "California", "New York", "Texas", "Washington",
+            "Massachusetts", "Illinois", "Florida", "Georgia", "Colorado",
+            "Virginia", "Pennsylvania",
+        ],
+        "United Kingdom": ["Any", "London", "Manchester", "Edinburgh", "Birmingham", "Bristol"],
+        "Canada": ["Any", "Ontario (Toronto)", "British Columbia (Vancouver)", "Quebec (Montreal)", "Alberta"],
+        "Germany": ["Any", "Berlin", "Munich", "Hamburg", "Frankfurt"],
+        "Australia": ["Any", "New South Wales (Sydney)", "Victoria (Melbourne)", "Queensland"],
+        "UAE": ["Any", "Dubai", "Abu Dhabi", "Sharjah"],
+        "Saudi Arabia": ["Any", "Riyadh", "Jeddah", "Dammam"],
+    }
+
+    current_country = profile.get("country", "India") if profile else "India"
+    if current_country not in COUNTRY_OPTIONS:
+        COUNTRY_OPTIONS.append(current_country)
+
+    loc_col1, loc_col2 = st.columns(2)
+    with loc_col1:
+        country_input = st.selectbox(
+            "📍 Country",
+            options=COUNTRY_OPTIONS,
+            index=COUNTRY_OPTIONS.index(current_country) if current_country in COUNTRY_OPTIONS else 0,
+            help="We'll prioritize jobs in your country"
+        )
+    with loc_col2:
+        state_list = STATE_OPTIONS.get(country_input, ["Any"])
+        current_state = profile.get("state", "Any") if profile else "Any"
+        if current_state not in state_list:
+            current_state = "Any"
+        state_input = st.selectbox(
+            "🏙️ State / City",
+            options=state_list,
+            index=state_list.index(current_state) if current_state in state_list else 0,
+            help="Refines search queries for more local results"
+        )
+
+    # Experience and job preference
+    exp_col1, exp_col2 = st.columns(2)
+    with exp_col1:
+        EXP_OPTIONS = ["0–1 years", "1–3 years", "3–6 years", "6–10 years", "10+ years"]
+        current_exp = profile.get("experience", "3–6 years") if profile else "3–6 years"
+        if current_exp not in EXP_OPTIONS:
+            current_exp = "3–6 years"
+        exp_input = st.selectbox(
+            "📅 Years of Experience",
+            options=EXP_OPTIONS,
+            index=EXP_OPTIONS.index(current_exp),
+            help="Used to filter out jobs too senior or too junior for you"
+        )
+    with exp_col2:
+        PREF_OPTIONS = ["🏙️ Local jobs in my city", "🌐 Remote jobs", "🔀 Both (local + remote)"]
+        current_pref = profile.get("job_preference", "🔀 Both (local + remote)") if profile else "🔀 Both (local + remote)"
+        if current_pref not in PREF_OPTIONS:
+            current_pref = "🔀 Both (local + remote)"
+        pref_input = st.selectbox(
+            "🎯 Job Preference",
+            options=PREF_OPTIONS,
+            index=PREF_OPTIONS.index(current_pref),
+            help="Focus search on local city jobs, remote-only, or both"
+        )
+    
+    if st.button("💾 Save Profile", use_container_width=True):
+        skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
+        if not skills_list and not name_input:
+            st.error("⚠️ Please enter at least a name or some skills")
+        else:
+            # Preserve fields from LLM parsing that user doesn't edit
+            existing = load_json(PROFILE_FILE) or {}
+            updated_profile = {
+                "name": name_input or "Candidate",
+                "headline": headline_input,
+                "skills": skills_list,
+                "country": country_input,
+                "state": state_input,
+                "experience": exp_input,
+                "job_preference": pref_input,
+                # Preserve LLM-extracted fields
+                "industry": existing.get("industry", ""),
+                "search_terms": existing.get("search_terms", []),
+            }
+            save_json(PROFILE_FILE, updated_profile)
+            st.success("✅ Profile saved!")
+            time.sleep(0.5)
+            st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================
-# STEP 2: RUN JOB MATCHING
+# STEP 2: JOB MATCHING
 # ============================================
 
-if profile and profile.get("skills"):
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="card-header">
-        <div class="card-icon">🎯</div>
-        <h2 class="card-title">Step 2: Find Your Perfect Match</h2>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown("""
+<div class="card-header">
+    <div class="card-icon">🎯</div>
+    <h2 class="card-title">Step 2: Job Matching</h2>
+</div>
+""", unsafe_allow_html=True)
+
+profile = load_json(PROFILE_FILE)
+profile_ready = bool(profile and profile.get("skills"))
+
+if not profile_ready:
+    st.warning("⚠️ Please complete your profile above to unlock job matching")
+else:
+    # Explain matching process
+    with st.expander("ℹ️ How does matching work?"):
+        st.markdown("""
+        **JobBot uses a 3-phase matching system:**
+        
+        1. **Keyword Extraction** - We extract skills from your resume + expand them with related terms
+        2. **Local Scoring** - All jobs are scored locally based on keyword overlap (fast, no API calls)
+        3. **AI Ranking** - Top 30-50 candidates sent to Gemini 2.5 Flash for final scoring
+        
+        **What we match on:**
+        - ✅ Your **skills** (primary signal - exact matches + variants)
+        - ✅ Your **headline** (job title/role context)
+        - ✅ Domain terms extracted from both
+        
+        **What we filter:**
+        - ❌ Non-English jobs
+        - ❌ Jobs too senior for your experience
+        - ❌ Duplicate postings across sources
+        """)
     
-    # Only show button if not currently running
-    if not st.session_state.get("_matching_running", False):
+    # Optional: Upload custom jobs
+    with st.expander("📁 Use Custom Jobs (Optional)"):
+        jobs_upload = st.file_uploader(
+            "Upload jobs.json",
+            type=["json"],
+            help="Upload your own jobs.json file instead of fetching from job boards"
+        )
+        if jobs_upload:
+            try:
+                jobs_data = json.loads(jobs_upload.getvalue())
+                save_json(JOBS_FILE, jobs_data)
+                st.success(f"✅ Loaded {len(jobs_data)} jobs from file")
+            except Exception as e:
+                st.error(f"❌ Invalid JSON file: {e}")
+    
+    # Run matching
+    if st.session_state.get("_matching_done"):
+        st.success("✅ Matching complete! Scroll down to see your matches.")
+        
+        # Check if results are thin and user has a city — offer to expand
+        matches_data_check = load_json(MATCHES_FILE)
+        match_count = len(matches_data_check) if isinstance(matches_data_check, list) else 0
+        user_state = profile.get("state", "Any") if profile else "Any"
+        user_country = profile.get("country", "") if profile else ""
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
+                st.session_state.pop("_matching_done", None)
+                for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                    if os.path.exists(fp):
+                        os.remove(fp)
+                if os.path.exists(LETTERS_DIR):
+                    for lf in os.listdir(LETTERS_DIR):
+                        os.remove(os.path.join(LETTERS_DIR, lf))
+                st.rerun()
+        
+        with col2:
+            if match_count < 5 and user_state != "Any" and user_country:
+                if st.button(f"🌍 Expand to all of {user_country}", type="primary", use_container_width=True):
+                    # Widen search: set state to "Any" and re-run
+                    profile_data = load_json(PROFILE_FILE)
+                    if profile_data:
+                        profile_data["state"] = "Any"
+                        save_json(PROFILE_FILE, profile_data)
+                    st.session_state.pop("_matching_done", None)
+                    for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                        if os.path.exists(fp):
+                            os.remove(fp)
+                    st.rerun()
+    
+    elif st.session_state.get("_matching_running"):
+        st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
+    
+    else:
         country = profile.get("country", "India")
         st.markdown(f"""
         **Ready to find your next role?**
