@@ -350,6 +350,8 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
     Fetch jobs from Serper.dev Google Jobs API.
     PRIMARY provider — 2,500 free searches/month.
     Falls back to SerpAPI if Serper is unavailable.
+    
+    FIXED: Now uses /jobs endpoint instead of /search for proper job data structure.
     """
     if not SERPER_API_KEY:
         logger.info("Serper.dev: No API key set (SERPER_API_KEY), skipping")
@@ -373,21 +375,28 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
                 "X-API-KEY": SERPER_API_KEY,
                 "Content-Type": "application/json"
             }
+            
+            # Build payload for /jobs endpoint
             payload = {
                 "q": search_query,
-                "gl": "us",
-                "hl": "en",
-                "num": 10,
+                "gl": "us",  # Country code
+                "hl": "en",  # Language
+                "num": 10,   # Number of results
             }
+            
             # Use location if provided
             loc = query_config.get("location")
             if loc and loc.lower() not in ("remote", "remote only", ""):
                 payload["gl"] = "in" if "india" in loc.lower() else "us"
-                payload["location"] = loc
+                # For jobs endpoint, location can be city name
+                if "india" in loc.lower() or "bangalore" in loc.lower() or "bengaluru" in loc.lower():
+                    payload["location"] = loc
 
             logger.info(f"Serper.dev: Searching '{search_query}'")
+            
+            # CRITICAL FIX: Use /jobs endpoint, not /search
             response = requests.post(
-                "https://google.serper.dev/search",
+                "https://google.serper.dev/jobs",  # Changed from /search to /jobs
                 json=payload, headers=headers, timeout=timeout
             )
             searches_used += 1
@@ -405,71 +414,83 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
             data = response.json()
             added = 0
 
-            for result in data.get("organic", [])[:10]:
+            # CRITICAL FIX: Parse 'jobs' array instead of 'organic'
+            for job_result in data.get("jobs", []):
                 try:
-                    title = result.get("title", "").strip()
-                    link = result.get("link", "").strip()
-                    snippet = result.get("snippet", "").strip()
-
-                    if not title or not link:
+                    # Serper.dev /jobs endpoint returns structured job data
+                    title = job_result.get("title", "").strip()
+                    company = job_result.get("companyName", "").strip() or "Unknown"
+                    description = job_result.get("description", "").strip()
+                    location = job_result.get("location", "").strip()
+                    
+                    # Get apply link - Serper provides the actual job application URL
+                    apply_link = job_result.get("applyLink", "").strip()
+                    if not apply_link:
+                        # Fallback to job link if apply link not available
+                        apply_link = job_result.get("link", "").strip()
+                    
+                    if not title or not apply_link:
                         continue
 
-                    # Extract company from title
-                    company = "Unknown"
-                    job_title = title
-                    for sep in [" - ", " | ", " — ", " at "]:
-                        if sep in title:
-                            parts = title.split(sep, 1)
-                            if len(parts) == 2 and len(parts[0]) < 60:
-                                company = parts[0].strip()
-                                job_title = parts[1].strip()
-                                break
-
-                    dedup_key = f"{job_title.lower()}|{company.lower()}"
+                    # Deduplication check
+                    dedup_key = f"{title.lower()}|{company.lower()}"
                     if dedup_key in seen_titles:
                         continue
                     seen_titles.add(dedup_key)
 
-                    # Detect source from URL
+                    # Detect source from apply URL
                     source_name = "Google Jobs"
-                    link_lower = link.lower()
-                    if "linkedin.com" in link_lower: source_name = "LinkedIn"
-                    elif "indeed.com" in link_lower: source_name = "Indeed"
-                    elif "naukri.com" in link_lower: source_name = "Naukri"
-                    elif "glassdoor" in link_lower: source_name = "Glassdoor"
-                    elif "foundit.in" in link_lower or "monster" in link_lower: source_name = "Foundit"
-                    elif "instahyre" in link_lower: source_name = "Instahyre"
-                    elif "wellfound" in link_lower or "angel.co" in link_lower: source_name = "Wellfound"
-                    elif "cutshort" in link_lower: source_name = "CutShort"
-                    elif "hirist" in link_lower: source_name = "Hirist"
-                    elif "jooble" in link_lower: source_name = "Jooble"
+                    link_lower = apply_link.lower()
+                    if "linkedin.com" in link_lower: 
+                        source_name = "LinkedIn"
+                    elif "indeed.com" in link_lower: 
+                        source_name = "Indeed"
+                    elif "naukri.com" in link_lower: 
+                        source_name = "Naukri"
+                    elif "glassdoor" in link_lower: 
+                        source_name = "Glassdoor"
+                    elif "foundit.in" in link_lower or "monster" in link_lower: 
+                        source_name = "Foundit"
+                    elif "instahyre" in link_lower: 
+                        source_name = "Instahyre"
+                    elif "wellfound" in link_lower or "angel.co" in link_lower: 
+                        source_name = "Wellfound"
+                    elif "cutshort" in link_lower: 
+                        source_name = "CutShort"
+                    elif "hirist" in link_lower: 
+                        source_name = "Hirist"
+                    elif "jooble" in link_lower: 
+                        source_name = "Jooble"
 
+                    # Build job object
                     job = {
-                        "title": job_title,
+                        "title": title,
                         "company": company,
-                        "summary": strip_html(snippet),
-                        "apply_url": link,
+                        "summary": f"{description[:500]} Location: {location}".strip(),
+                        "apply_url": apply_link,
                         "source": source_name,
                     }
 
-                    # Try to extract posted date from snippet
-                    posted = _parse_posted_date_str(snippet)
-                    if posted:
-                        job["posted_date"] = posted
+                    # Extract posted date if available
+                    posted_str = job_result.get("datePosted", "")
+                    if posted_str:
+                        parsed_date = _parse_posted_date_str(posted_str)
+                        if parsed_date:
+                            job["posted_date"] = parsed_date
 
-                    # Also check the date field from Serper
-                    date_str = result.get("date", "")
-                    if date_str and not job.get("posted_date"):
-                        job["posted_date"] = _parse_posted_date_str(date_str)
-
+                    # Add location tags
                     job["location_tags"] = extract_location_from_job(job)
+                    
                     jobs.append(job)
                     added += 1
-                except Exception:
+                    
+                except Exception as e:
+                    logger.debug(f"Serper.dev: Error parsing job result: {e}")
                     continue
 
             logger.info(f"Serper.dev: '{search_query}' -> {added} new jobs")
 
+            # Rate limiting delay
             if searches_used < len(queries):
                 time.sleep(0.5)
 
