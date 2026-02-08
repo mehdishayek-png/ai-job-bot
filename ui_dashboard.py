@@ -673,21 +673,46 @@ if isinstance(matches_data, list) and matches_data:
             with c1:
                 st.markdown(f"**{ti}**")
                 ih = f"🏢 **{co}**"
-                if src: ih += f" · <span class='source-badge'>{src}</span>"
-                if ts_text: ih += f" · <span class='timestamp-badge {ts_css}'>🕐 {ts_text}</span>"
-                if ip: ih += " · <span class='pin-badge'>📌 Pinned</span>"
-                st.markdown(ih, unsafe_allow_html=True)
-
+                
+                # Show location (prioritize job.location field)
                 jl = j.get("location", "")
                 if not jl:
-                    for t in j.get("location_tags", []):
-                        if t: jl = t; break
-                parts = []
-                if jl: parts.append(f"📍 {jl}")
+                    # Fallback to location_tags
+                    tags = j.get("location_tags", [])
+                    if tags and isinstance(tags, list):
+                        jl = ", ".join([t.title() for t in tags if t and t != "global"])
+                if jl:
+                    ih += f" · 📍 {jl}"
+                
+                # Show source
+                if src:
+                    ih += f" · <span class='source-badge'>{src}</span>"
+                
+                # Show posted date
+                pd = j.get("posted_date", "")
+                if pd:
+                    # Format posted date nicely
+                    if "ago" in pd.lower() or "today" in pd.lower():
+                        ih += f" · <span class='timestamp-badge timestamp-today'>🕐 {pd}</span>"
+                    elif ts_text:
+                        ih += f" · <span class='timestamp-badge {ts_css}'>🕐 {ts_text}</span>"
+                elif ts_text:
+                    ih += f" · <span class='timestamp-badge {ts_css}'>🕐 {ts_text}</span>"
+                
+                # Show if pinned
+                if ip:
+                    ih += " · <span class='pin-badge'>📌 Pinned</span>"
+                
+                st.markdown(ih, unsafe_allow_html=True)
+
+                # Show experience if mentioned in summary
                 em = re.search(r'(\d+)\+?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)?', j.get("summary", "").lower())
-                if em: parts.append(f"📅 {em.group(0).strip()}")
-                if parts: st.caption(" · ".join(parts))
-                if sm: st.write(sm)
+                if em:
+                    st.caption(f"📅 Experience: {em.group(0).strip()}")
+                
+                # Show summary
+                if sm:
+                    st.write(sm)
 
             with c2:
                 bc = "score-excellent" if sc >= 75 else ("score-good" if sc >= 60 else "score-fair")
