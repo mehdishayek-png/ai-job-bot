@@ -7,6 +7,7 @@ import time
 import io
 import zipfile
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # ============================================
 # PAGE CONFIG — MUST BE FIRST
@@ -594,6 +595,10 @@ def toggle_pin(k):
     p.symmetric_difference_update({k})
     st.session_state["_pins"] = p
 def jkey(j): return f"{j.get('company','')}__{j.get('title','')}__{j.get('apply_url','')[:50]}"
+
+# Load profile and matches early for sidebar display
+profile = load_j(PF)
+matches = load_j(MF)
 
 # ============================================
 # SIDEBAR
