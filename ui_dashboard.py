@@ -857,6 +857,19 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
         "Australia", "UAE", "Saudi Arabia", "Singapore", "Remote Only",
     ]
     
+    STATE_OPTIONS = {
+        "India": ["Any", "Karnataka (Bangalore)", "Maharashtra (Mumbai/Pune)", "Delhi NCR", "Telangana (Hyderabad)", "Tamil Nadu (Chennai)", "West Bengal (Kolkata)", "Gujarat (Ahmedabad)", "Rajasthan (Jaipur)", "Uttar Pradesh (Noida/Lucknow)", "Kerala (Kochi)", "Haryana (Gurgaon)"],
+        "United States": ["Any", "California", "New York", "Texas", "Washington", "Massachusetts", "Illinois", "Florida", "Georgia", "Colorado"],
+        "United Kingdom": ["Any", "London", "Manchester", "Edinburgh", "Birmingham"],
+        "Canada": ["Any", "Ontario (Toronto)", "British Columbia (Vancouver)", "Quebec (Montreal)", "Alberta (Calgary)"],
+        "Germany": ["Any", "Berlin", "Munich", "Hamburg", "Frankfurt"],
+        "Australia": ["Any", "New South Wales (Sydney)", "Victoria (Melbourne)", "Queensland (Brisbane)"],
+        "UAE": ["Any", "Dubai", "Abu Dhabi"],
+        "Saudi Arabia": ["Any", "Riyadh", "Jeddah"],
+        "Singapore": ["Any"],
+        "Remote Only": ["Any"],
+    }
+    
     current_country = profile.get("country", "India") if profile else "India"
     if current_country not in COUNTRY_OPTIONS:
         COUNTRY_OPTIONS.append(current_country)
@@ -865,7 +878,11 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
     with col_c:
         country_input = st.selectbox("📍 Country", options=COUNTRY_OPTIONS)
     with col_s:
-        state_input = st.text_input("🏙️ City/State", value=profile.get("state", "Any") if profile else "Any")
+        state_opts = STATE_OPTIONS.get(country_input, ["Any"])
+        current_state = profile.get("state", "Any") if profile else "Any"
+        if current_state not in state_opts:
+            state_opts = state_opts + [current_state]
+        state_input = st.selectbox("🏙️ City/State", options=state_opts, index=state_opts.index(current_state) if current_state in state_opts else 0)
     
     col_e, col_p = st.columns(2)
     with col_e:
