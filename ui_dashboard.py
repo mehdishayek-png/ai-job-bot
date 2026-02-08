@@ -7,7 +7,7 @@ import time
 import io
 import zipfile
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # ============================================
 # PAGE CONFIG — MUST BE FIRST
@@ -1077,7 +1077,7 @@ if isinstance(matches_data, list) and matches_data:
     
     # Sorting
     if sort_by == "Date Posted":
-        filtered_jobs = sorted(filtered_jobs, key=lambda x: parse_job_date(x) or datetime.min, reverse=True)
+        filtered_jobs = sorted(filtered_jobs, key=lambda x: parse_job_date(x) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     elif sort_by == "Highest Score":
         filtered_jobs = sorted(filtered_jobs, key=lambda x: x.get("match_score", 0), reverse=True)
     elif sort_by == "Lowest Score":
