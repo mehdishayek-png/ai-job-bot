@@ -9,504 +9,224 @@ import zipfile
 from dotenv import load_dotenv
 
 # ============================================
-# PAGE CONFIG  MUST BE FIRST
+# PAGE CONFIG — MUST BE FIRST
 # ============================================
 
 st.set_page_config(
-    page_title="Job AI Search · Powered by AI",
-    page_icon="J",
+    page_title="JobBot · AI-Powered Job Matching",
+    page_icon="🚀",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================
-# CUSTOM CSS  Matching Design Image
+# CUSTOM CSS — 2026 Glassmorphism + Modern Design
 # ============================================
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ============ GLOBAL ============ */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-.stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #F7FAFC;
+:root{
+  --bg: #0e1525;
+  --top: #161e31;
+  --panel: #161f32;
+  --muted: #989898;
+  --stroke: #515151;
+  --card: #2f3749;
+  --chip: #353d4f;
+  --accent: #5365ff;
+  --grad-a: #1a86e8;
+  --grad-b: #6f57ea;
 }
 
+/* ===== App shell ===== */
+* { box-sizing: border-box; }
+.stApp {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+}
+
+/* Reduce Streamlit chrome */
+#MainMenu, footer { visibility: hidden; }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* Tighter page padding so the layout feels like the SVG */
+div.block-container { padding-top: 0.5rem; padding-left: 1.25rem; padding-right: 1.25rem; }
+
+/* Headings */
 h1, h2, h3, h4, h5, h6,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    font-family: 'Inter', sans-serif !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.02em;
-    color: #1A202C !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  color: #ffffff !important;
 }
 
-p, li, span, div { color: #4A5568; }
+/* Default text */
+p, li, span, div, label { color: #ffffff; }
+.stCaption, .stMarkdown p { color: var(--muted) !important; }
 
-code, .stCode, pre {
-    font-family: 'JetBrains Mono', monospace !important;
+code, .stCode, pre { font-family: 'JetBrains Mono', monospace !important; }
+
+/* ===== Top bar (SVG-like) ===== */
+.topbar {
+  background: var(--top);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.75rem 0 1.25rem;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.brand-badge {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+.brand-title { font-size: 1.4rem; font-weight: 800; margin: 0; }
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.nav-pill {
+  padding: 0.7rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: transparent;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.nav-pill.active {
+  border: none;
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b));
 }
 
-/* ============ HERO SECTION ============ */
-.hero {
-    background: linear-gradient(135deg, #5B8DEF 0%, #5DD3D4 100%);
-    border-radius: 24px;
-    padding: 3rem 2.5rem;
-    margin-bottom: 2.5rem;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 10px 40px rgba(91, 141, 239, 0.2);
-}
+/* The SVG design doesn't include a stepper — hide it to keep the mainframe clean */
+.stepper { display: none; }
 
-.hero::before {
-    content: '';
-    position: absolute;
-    top: -30%;
-    right: -10%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
-    filter: blur(60px);
-}
-
-.hero-content { 
-    position: relative; 
-    z-index: 1; 
-}
-
-.hero h1 {
-    color: #FFFFFF !important;
-    font-size: 2.5rem !important;
-    font-weight: 700 !important;
-    margin: 0 0 0.75rem 0 !important;
-    line-height: 1.2;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-
-.hero-subtitle {
-    color: rgba(255,255,255,0.95);
-    font-size: 1.05rem;
-    margin: 0 0 1.5rem 0;
-    font-weight: 400;
-    line-height: 1.6;
-}
-
-.hero-tags {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.hero-tag {
-    background: rgba(255,255,255,0.2);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: #FFFFFF;
-    padding: 0.5rem 1rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-}
-
-/* ============ STEPPER ============ */
-.stepper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 0rem;
-    margin: 2rem auto 2.5rem;
-    padding: 1.5rem 2rem;
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 16px;
-    max-width: 800px;
-}
-
-.step {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #718096;
-    flex: 1;
-    justify-content: center;
-}
-
-.step-icon {
-    width: 40px; 
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    font-weight: 700;
-    flex-shrink: 0;
-}
-
-.step.done .step-icon {
-    background: #5B8DEF;
-    color: #FFFFFF;
-}
-
-.step.done {
-    color: #2D3748;
-}
-
-.step.active .step-icon {
-    background: #5B8DEF;
-    color: #FFFFFF;
-}
-
-.step.active {
-    color: #2D3748;
-}
-
-.step.pending .step-icon {
-    background: #EDF2F7;
-    color: #A0AEC0;
-    border: 2px solid #E2E8F0;
-}
-
-.step-connector {
-    width: 80px; 
-    height: 2px;
-    background: #E2E8F0;
-    flex-shrink: 0;
-}
-
-/* ============ CARDS ============ */
+/* ===== Cards / panels ===== */
 .glass-card {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 16px;
-    padding: 2.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem;
+  margin-bottom: 1.05rem;
 }
+.glass-card:hover { box-shadow: 0 10px 26px rgba(0,0,0,0.20); }
 
-.card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 2rem;
-}
-
+.card-header { display:flex; align-items:center; gap:0.8rem; margin-bottom: 0.9rem; }
 .card-icon {
-    width: 36px; 
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display:flex; align-items:center; justify-content:center;
+  background: var(--card);
+  border: 1px solid var(--stroke);
+  font-size: 1.25rem;
 }
+.card-title { font-size: 1.2rem !important; font-weight: 800 !important; margin: 0 !important; }
 
-.card-title {
-    font-size: 1.25rem !important;
-    font-weight: 600 !important;
-    color: #1A202C !important;
-    margin: 0 !important;
-}
-
-/* ============ SKILL CHIPS ============ */
-.skills-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-
+/* ===== Skill chips ===== */
+.skills-container { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top: 0.75rem; }
 .skill-chip {
-    background: #EDF2F7;
-    border: 1px solid #E2E8F0;
-    color: #2D3748;
-    padding: 0.4rem 0.85rem;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    font-weight: 500;
+  background: var(--chip);
+  border: 1px solid var(--stroke);
+  color: #fff;
+  padding: 0.35rem 0.8rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
-/* ============ STATS ============ */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1.25rem;
-    margin: 2rem 0;
-}
+/* ===== Stats ===== */
+.stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.85rem; margin: 1.2rem 0 1.4rem; }
+.stat-card { background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px; padding: 1.1rem 0.9rem; text-align:center; }
+.stat-value { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 0.25rem; }
+.stat-label { color: var(--muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 
-.stat-card {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 1.75rem 1.25rem;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
+/* ===== Badges ===== */
+.score-badge { display:inline-block; padding: 0.35rem 0.85rem; border-radius: 10px; font-size: 0.9rem; font-weight: 800; border: 1px solid var(--stroke); background: var(--card); color: #fff; }
+.score-excellent, .score-good, .score-fair { background: var(--card); color: #fff; border: 1px solid var(--stroke); }
+.source-badge { display:inline-block; padding: 0.22rem 0.6rem; border-radius: 8px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; background: var(--chip); border: 1px solid var(--stroke); color: #fff; }
 
-.stat-value {
-    font-size: 2.25rem;
-    font-weight: 700;
-    color: #5B8DEF;
-    line-height: 1;
-    margin-bottom: 0.5rem;
-}
-
-.stat-label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #718096;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* ============ SCORE BADGES ============ */
-.score-badge {
-    display: inline-block;
-    padding: 0.75rem 1.5rem;
-    border-radius: 12px;
-    font-size: 1.5rem;
-    font-weight: 800;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.score-excellent {
-    background: linear-gradient(135deg, #48BB78 0%, #38A169 100%);
-    color: #FFFFFF;
-}
-
-.score-good {
-    background: linear-gradient(135deg, #ED8936 0%, #DD6B20 100%);
-    color: #FFFFFF;
-}
-
-.score-fair {
-    background: linear-gradient(135deg, #667EEA 0%, #5A67D8 100%);
-    color: #FFFFFF;
-}
-
-/* ============ SOURCE BADGE ============ */
-.source-badge {
-    background: #EDF2F7;
-    color: #5B8DEF;
-    padding: 0.3rem 0.75rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-/* ============ COVER LETTER ============ */
-.cover-letter-label {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #1A202C;
-    margin: 1.5rem 0 1rem;
-}
-
-.cover-letter-box {
-    background: #F7FAFC;
-    border: 2px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 1.75rem;
-    margin: 1rem 0;
-    line-height: 1.8;
-    color: #4A5568;
-    font-size: 0.95rem;
-}
-
-/* ============ INPUTS - DARK THEME MATCHING DESIGN ============ */
+/* ===== Inputs ===== */
 .stTextInput > div > div > input,
-.stTextArea > div > div > textarea {
-    background: #2D3748 !important;
-    border: 1px solid #2D3748 !important;
-    border-radius: 8px !important;
-    color: #FFFFFF !important;
-    font-size: 0.95rem !important;
-    padding: 0.75rem 1rem !important;
-}
-
-.stTextInput > div > div > input::placeholder,
-.stTextArea > div > div > textarea::placeholder {
-    color: #A0AEC0 !important;
-}
-
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-    border-color: #5B8DEF !important;
-    box-shadow: 0 0 0 1px #5B8DEF !important;
-}
-
-/* Input labels */
-.stTextInput label,
-.stTextArea label,
-.stSelectbox label,
-.stFileUploader label {
-    color: #4A5568 !important;
-    font-weight: 500 !important;
-    font-size: 0.9rem !important;
-    margin-bottom: 0.5rem !important;
-}
-
-/* Select boxes */
-.stSelectbox > div > div {
-    background: #2D3748 !important;
-    border: 1px solid #2D3748 !important;
-    border-radius: 8px !important;
-}
-
-.stSelectbox > div > div > select,
-.stSelectbox > div > div > div {
-    color: #FFFFFF !important;
-    background: #2D3748 !important;
-}
-
-/* ============ BUTTONS ============ */
-.stButton > button {
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    transition: all 0.2s ease !important;
-    border: none !important;
-    padding: 0.75rem 1.5rem !important;
-    font-size: 0.95rem !important;
-}
-
-.stButton > button[kind="primary"] {
-    background: #5B8DEF !important;
-    color: #FFFFFF !important;
-}
-
-.stButton > button[kind="primary"]:hover {
-    background: #4A7BD8 !important;
-}
-
-.stButton > button:not([kind="primary"]) {
-    background: #FFFFFF !important;
-    color: #5B8DEF !important;
-    border: 1px solid #5B8DEF !important;
-}
-
-.stButton > button:not([kind="primary"]):hover {
-    background: #EDF2F7 !important;
-}
-
-/* ============ DIVIDER ============ */
-.divider {
-    height: 2px;
-    background: linear-gradient(90deg, transparent 0%, #E2E8F0 20%, #E2E8F0 80%, transparent 100%);
-    margin: 3rem 0;
-}
-
-/* ============ FOOTER ============ */
-.footer {
-    margin-top: 4rem;
-    padding: 2rem;
-    text-align: center;
-    color: #718096;
-    font-size: 0.9rem;
-    border-top: 1px solid #E2E8F0;
-    background: #FFFFFF;
-}
-
-.footer a {
-    color: #5B8DEF;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.footer a:hover {
-    color: #4A7BD8;
-    text-decoration: underline;
-}
-
-/* ============ STREAMLIT OVERRIDES ============ */
-.stExpander {
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 12px !important;
-    overflow: hidden !important;
-    margin-bottom: 1rem !important;
-    background: #FFFFFF !important;
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div,
+.stMultiSelect > div > div,
+.stNumberInput > div > div > input {
+  background: var(--top) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 12px !important;
+  color: #fff !important;
 }
 
 /* File uploader */
-.stFileUploader > div {
-    background: #F7FAFC !important;
-    border: 2px dashed #CBD5E0 !important;
-    border-radius: 12px !important;
-    padding: 2rem !important;
+div[data-testid="stFileUploader"] section {
+  background: var(--top) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 12px !important;
 }
 
-.stFileUploader label {
-    color: #4A5568 !important;
+/* ===== Buttons (gradient like SVG) ===== */
+.stButton > button,
+div[data-testid="stDownloadButton"] button {
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b)) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 0.72rem 1.2rem !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.28) !important;
+}
+.stButton > button:hover,
+div[data-testid="stDownloadButton"] button:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 
-/* Progress bar */
-.stProgress > div > div {
-    background: linear-gradient(90deg, #5B8DEF 0%, #5DD3D4 100%) !important;
-    border-radius: 10px !important;
+/* ===== Expanders / job cards ===== */
+div[data-testid="stExpander"] details > summary {
+  background: var(--panel) !important;
+  border: 1px solid var(--stroke) !important;
+  border-radius: 14px !important;
 }
+div[data-testid="stExpander"] details summary span { color: #fff !important; font-weight: 700 !important; }
 
-/* Download button */
-.stDownloadButton > button {
-    background: #48BB78 !important;
-    color: #FFFFFF !important;
-}
+/* ===== Divider ===== */
+.divider { height: 1px; background: var(--stroke); margin: 1.6rem 0; opacity: 0.55; }
 
-.stDownloadButton > button:hover {
-    background: #38A169 !important;
-}
+/* ===== Cover letter box ===== */
+.cover-letter-box { background: var(--top); border: 1px solid var(--stroke); border-radius: 12px; padding: 1.1rem; margin-top: 0.75rem; color: #fff; line-height: 1.7; font-size: 0.9rem; }
+.cover-letter-label { color: var(--muted); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.5rem; }
 
-/* Captions */
-.stCaption {
-    color: #718096 !important;
-    font-size: 0.875rem !important;
-}
+/* ===== Progress bar ===== */
+.stProgress > div > div { background: var(--top) !important; }
+.stProgress > div > div > div { background: var(--accent) !important; }
 
-/* Link button */
-.stLinkButton > a {
-    background: #5B8DEF !important;
-    color: #FFFFFF !important;
-    border-radius: 8px !important;
-    padding: 0.75rem 1.5rem !important;
-    text-decoration: none !important;
-    font-weight: 600 !important;
-    display: inline-block !important;
-}
-
-.stLinkButton > a:hover {
-    background: #4A7BD8 !important;
-}
-
-/* Markdown and text colors */
-.stMarkdown, .stMarkdown p, .stText { color: #4A5568 !important; }
-.stAlert p { color: inherit !important; }
-
-/* Expander content readability */
-div[data-testid="stExpander"] details summary span { color: #1A202C !important; }
-div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #4A5568 !important; }
-
-/* Code blocks */
-.stCodeBlock, pre { background: #F7FAFC !important; color: #4A5568 !important; }
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--card); border-radius: 999px; border: 1px solid var(--stroke); }
+::-webkit-scrollbar-thumb:hover { background: var(--chip); }
 
 /* Links */
-a { color: #5B8DEF; }
-a:hover { color: #4A7BD8; }
+a { color: #ffffff; text-decoration: underline; }
+a:hover { color: #ffffff; opacity: 0.9; }
 
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #FFFFFF;
-    border-right: 1px solid #E2E8F0;
-}
-section[data-testid="stSidebar"] * { color: #4A5568; }
+/* Code blocks */
+.stCodeBlock, pre { background: var(--top) !important; color: #fff !important; border: 1px solid var(--stroke); border-radius: 12px; }
 </style>
-""", unsafe_allow_html=True)
-
 """, unsafe_allow_html=True)
 
 # ============================================
@@ -516,7 +236,7 @@ section[data-testid="stSidebar"] * { color: #4A5568; }
 load_dotenv()
 
 # ============================================
-# MODULE RELOAD  Critical for Streamlit hot-reload
+# MODULE RELOAD — Critical for Streamlit hot-reload
 # ============================================
 import importlib
 import sys
@@ -631,17 +351,17 @@ def find_cover_letter(company, title):
 # ============================================
 
 with st.sidebar:
-    st.markdown("###  Session Control")
+    st.markdown("### 🎯 Session Control")
     st.caption(f"Session ID: `{SESSION_ID}`")
     
-    if st.button(" Start Fresh Session", use_container_width=True):
+    if st.button("🔄 Start Fresh Session", use_container_width=True):
         # Clear session state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
     
     st.markdown("---")
-    st.markdown("###  About JobBot")
+    st.markdown("### 📊 About JobBot")
     st.markdown("""
     **How it works:**
     1. **Skills-based matching** - Extracts skills from your resume
@@ -651,7 +371,7 @@ with st.sidebar:
     """)
     
     st.markdown("---")
-    st.markdown("###  Job Sources")
+    st.markdown("### 🔍 Job Sources")
     st.markdown("""
     - WeWorkRemotely (6 categories)
     - RemoteOK
@@ -660,23 +380,22 @@ with st.sidebar:
     """)
 
 # ============================================
-# HERO SECTION
+# TOP BAR (SVG-STYLE)
 # ============================================
 
 st.markdown("""
-<div class="hero">
-    <div class="hero-content">
-        <h1> Job AI Search</h1>
-        <p class="hero-subtitle">
-            Intelligent job matching powered by AI. Upload your resume, set your preferences, and discover opportunities tailored specifically for you.
-        </p>
-        <div class="hero-tags">
-            <span class="hero-tag">6 Job Sources</span>
-            <span class="hero-tag">AI-Powered Matching</span>
-            <span class="hero-tag">Auto Cover Letters</span>
-            <span class="hero-tag">Global + Remote</span>
-        </div>
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-badge"></div>
+    <div>
+      <div class="brand-title">AI Job Search</div>
+      <div style="color: var(--muted); font-weight: 600; margin-top: 2px; font-size: 0.92rem;">Compiled jobs according to profile</div>
     </div>
+  </div>
+  <div class="nav">
+    <div class="nav-pill active">My Profile</div>
+    <div class="nav-pill">Tailor CV</div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -694,18 +413,18 @@ step3_status = "done" if os.path.exists(LETTERS_DIR) and os.listdir(LETTERS_DIR)
 st.markdown(f"""
 <div class="stepper">
     <div class="step {step1_status}">
-        <div class="step-icon">1</div>
-        <span>Your Profile</span>
+        <div class="step-icon">📄</div>
+        <span>Upload Resume</span>
     </div>
     <div class="step-connector"></div>
     <div class="step {step2_status}">
-        <div class="step-icon">2</div>
-        <span>Job Matching</span>
+        <div class="step-icon">🎯</div>
+        <span>Match Jobs</span>
     </div>
     <div class="step-connector"></div>
     <div class="step {step3_status}">
-        <div class="step-icon">3</div>
-        <span>Results</span>
+        <div class="step-icon">✉️</div>
+        <span>Generate Letters</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -717,8 +436,8 @@ st.markdown(f"""
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown("""
 <div class="card-header">
-    <div class="card-icon"></div>
-    <h2 class="card-title">Step 1: Build Your Profile</h2>
+    <div class="card-icon">📄</div>
+    <h2 class="card-title">Step 1: Your Profile</h2>
 </div>
 """, unsafe_allow_html=True)
 
@@ -728,13 +447,13 @@ with col1:
     uploaded_resume = st.file_uploader(
         "Upload your resume (PDF)",
         type=["pdf"],
-        help="We will extract your skills, experience, and headline automatically",
+        help="We'll extract your skills, experience, and headline automatically",
         key="resume_upload"
     )
 
 with col2:
     if uploaded_resume:
-        if st.button(" Parse Resume", type="primary", use_container_width=True):
+        if st.button("🔍 Parse Resume", type="primary", use_container_width=True):
             with st.spinner("Analyzing your resume..."):
                 try:
                     # Save uploaded file
@@ -756,23 +475,23 @@ with col2:
                         # Set defaults if first time
                         profile.setdefault("country", "India")
                         profile.setdefault("state", "Any")
-                        profile.setdefault("experience", "36 years")
-                        profile.setdefault("job_preference", " Both (local + remote)")
+                        profile.setdefault("experience", "3–6 years")
+                        profile.setdefault("job_preference", "🔀 Both (local + remote)")
                         save_json(PROFILE_FILE, profile)
                     
-                    st.success(" Resume parsed successfully!")
+                    st.success("✅ Resume parsed successfully!")
                     time.sleep(0.5)
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f" Error parsing resume: {e}")
+                    st.error(f"❌ Error parsing resume: {e}")
 
 # Display current profile
 profile = load_json(PROFILE_FILE)
 
 if profile and profile.get("skills"):
     st.markdown("---")
-    st.markdown(f"** {profile.get('name', 'Candidate')}**")
+    st.markdown(f"**👤 {profile.get('name', 'Candidate')}**")
     if profile.get('headline'):
         st.caption(profile['headline'])
     
@@ -780,7 +499,7 @@ if profile and profile.get("skills"):
     if skills:
         skills_html = "".join([f'<span class="skill-chip">{s}</span>' for s in skills])
         st.markdown(f'<div class="skills-container">{skills_html}</div>', unsafe_allow_html=True)
-        st.caption(f" {len(skills)} skills detected - used for keyword matching")
+        st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
 
     # Display location preferences
     country = profile.get("country", "")
@@ -789,19 +508,19 @@ if profile and profile.get("skills"):
         loc_display = country
         if state and state != "Any":
             loc_display += f" · {state}"
-        st.caption(f" {loc_display}")
+        st.caption(f"📍 {loc_display}")
     if profile.get("location_preferences"):
         prefs = profile["location_preferences"]
         pref_names = []
         name_map = {"americas": "Americas", "europe": "Europe", "asia": "Asia-Pacific", "global": "Global"}
         for p in prefs:
             pref_names.append(name_map.get(p, p.title()))
-        st.caption(f" Regions: {', '.join(pref_names)}")
+        st.caption(f"📍 Regions: {', '.join(pref_names)}")
 else:
-    st.info(" Upload your resume to get started, or create a profile manually below")
+    st.info("👆 Upload your resume to get started, or create a profile manually below")
 
 # Manual profile editing
-with st.expander(" Edit Profile Manually" if profile else " Create Profile Manually"):
+with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create Profile Manually"):
     name_input = st.text_input("Full Name", value=profile.get("name", "") if profile else "")
     headline_input = st.text_input("Professional Headline", value=profile.get("headline", "") if profile else "")
     skills_input = st.text_area(
@@ -811,7 +530,7 @@ with st.expander(" Edit Profile Manually" if profile else " Create Profile Manua
         help="Enter specific skills, tools, and technologies - these are used for matching"
     )
 
-    # Location selectors  country + state/city
+    # Location selectors — country + state/city
     COUNTRY_OPTIONS = [
         "India", "United States", "United Kingdom", "Canada", "Germany",
         "Australia", "UAE", "Saudi Arabia", "Singapore", "Netherlands",
@@ -844,10 +563,10 @@ with st.expander(" Edit Profile Manually" if profile else " Create Profile Manua
     loc_col1, loc_col2 = st.columns(2)
     with loc_col1:
         country_input = st.selectbox(
-            " Country",
+            "📍 Country",
             options=COUNTRY_OPTIONS,
             index=COUNTRY_OPTIONS.index(current_country) if current_country in COUNTRY_OPTIONS else 0,
-            help="We will prioritize jobs in your country"
+            help="We'll prioritize jobs in your country"
         )
     with loc_col2:
         state_list = STATE_OPTIONS.get(country_input, ["Any"])
@@ -855,7 +574,7 @@ with st.expander(" Edit Profile Manually" if profile else " Create Profile Manua
         if current_state not in state_list:
             current_state = "Any"
         state_input = st.selectbox(
-            " State / City",
+            "🏙️ State / City",
             options=state_list,
             index=state_list.index(current_state) if current_state in state_list else 0,
             help="Refines search queries for more local results"
@@ -864,32 +583,32 @@ with st.expander(" Edit Profile Manually" if profile else " Create Profile Manua
     # Experience and job preference
     exp_col1, exp_col2 = st.columns(2)
     with exp_col1:
-        EXP_OPTIONS = ["01 years", "13 years", "36 years", "610 years", "10+ years"]
-        current_exp = profile.get("experience", "36 years") if profile else "36 years"
+        EXP_OPTIONS = ["0–1 years", "1–3 years", "3–6 years", "6–10 years", "10+ years"]
+        current_exp = profile.get("experience", "3–6 years") if profile else "3–6 years"
         if current_exp not in EXP_OPTIONS:
-            current_exp = "36 years"
+            current_exp = "3–6 years"
         exp_input = st.selectbox(
-            " Years of Experience",
+            "📅 Years of Experience",
             options=EXP_OPTIONS,
             index=EXP_OPTIONS.index(current_exp),
             help="Used to filter out jobs too senior or too junior for you"
         )
     with exp_col2:
-        PREF_OPTIONS = [" Local jobs in my city", " Remote jobs", " Both (local + remote)"]
-        current_pref = profile.get("job_preference", " Both (local + remote)") if profile else " Both (local + remote)"
+        PREF_OPTIONS = ["🏙️ Local jobs in my city", "🌐 Remote jobs", "🔀 Both (local + remote)"]
+        current_pref = profile.get("job_preference", "🔀 Both (local + remote)") if profile else "🔀 Both (local + remote)"
         if current_pref not in PREF_OPTIONS:
-            current_pref = " Both (local + remote)"
+            current_pref = "🔀 Both (local + remote)"
         pref_input = st.selectbox(
-            " Job Preference",
+            "🎯 Job Preference",
             options=PREF_OPTIONS,
             index=PREF_OPTIONS.index(current_pref),
             help="Focus search on local city jobs, remote-only, or both"
         )
     
-    if st.button(" Save Profile", use_container_width=True):
+    if st.button("💾 Save Profile", use_container_width=True):
         skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
         if not skills_list and not name_input:
-            st.error(" Please enter at least a name or some skills")
+            st.error("⚠️ Please enter at least a name or some skills")
         else:
             # Preserve fields from LLM parsing that user doesn't edit
             existing = load_json(PROFILE_FILE) or {}
@@ -906,7 +625,7 @@ with st.expander(" Edit Profile Manually" if profile else " Create Profile Manua
                 "search_terms": existing.get("search_terms", []),
             }
             save_json(PROFILE_FILE, updated_profile)
-            st.success(" Profile saved!")
+            st.success("✅ Profile saved!")
             time.sleep(0.5)
             st.rerun()
 
@@ -920,7 +639,7 @@ st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown("""
 <div class="card-header">
-    <div class="card-icon"></div>
+    <div class="card-icon">🎯</div>
     <h2 class="card-title">Step 2: Job Matching</h2>
 </div>
 """, unsafe_allow_html=True)
@@ -929,10 +648,10 @@ profile = load_json(PROFILE_FILE)
 profile_ready = bool(profile and profile.get("skills"))
 
 if not profile_ready:
-    st.warning(" Please complete your profile above to unlock job matching")
+    st.warning("⚠️ Please complete your profile above to unlock job matching")
 else:
     # Explain matching process
-    with st.expander("How does matching work?"):
+    with st.expander("ℹ️ How does matching work?"):
         st.markdown("""
         **JobBot uses a 3-phase matching system:**
         
@@ -941,18 +660,18 @@ else:
         3. **AI Ranking** - Top 30-50 candidates sent to Gemini 2.5 Flash for final scoring
         
         **What we match on:**
-        -  Your **skills** (primary signal - exact matches + variants)
-        -  Your **headline** (job title/role context)
-        -  Domain terms extracted from both
+        - ✅ Your **skills** (primary signal - exact matches + variants)
+        - ✅ Your **headline** (job title/role context)
+        - ✅ Domain terms extracted from both
         
         **What we filter:**
-        -  Non-English jobs
-        -  Jobs too senior for your experience
-        -  Duplicate postings across sources
+        - ❌ Non-English jobs
+        - ❌ Jobs too senior for your experience
+        - ❌ Duplicate postings across sources
         """)
     
     # Optional: Upload custom jobs
-    with st.expander(" Use Custom Jobs (Optional)"):
+    with st.expander("📁 Use Custom Jobs (Optional)"):
         jobs_upload = st.file_uploader(
             "Upload jobs.json",
             type=["json"],
@@ -962,15 +681,15 @@ else:
             try:
                 jobs_data = json.loads(jobs_upload.getvalue())
                 save_json(JOBS_FILE, jobs_data)
-                st.success(f" Loaded {len(jobs_data)} jobs from file")
+                st.success(f"✅ Loaded {len(jobs_data)} jobs from file")
             except Exception as e:
-                st.error(f" Invalid JSON file: {e}")
+                st.error(f"❌ Invalid JSON file: {e}")
     
     # Run matching
     if st.session_state.get("_matching_done"):
-        st.success(" Matching complete! Scroll down to see your matches.")
+        st.success("✅ Matching complete! Scroll down to see your matches.")
         
-        # Check if results are thin and user has a city  offer to expand
+        # Check if results are thin and user has a city — offer to expand
         matches_data_check = load_json(MATCHES_FILE)
         match_count = len(matches_data_check) if isinstance(matches_data_check, list) else 0
         user_state = profile.get("state", "Any") if profile else "Any"
@@ -978,7 +697,7 @@ else:
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button(" Re-run Matching (Fresh Jobs)", use_container_width=True):
+            if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
                 st.session_state.pop("_matching_done", None)
                 for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
                     if os.path.exists(fp):
@@ -990,7 +709,7 @@ else:
         
         with col2:
             if match_count < 5 and user_state != "Any" and user_country:
-                if st.button(f" Expand to all of {user_country}", type="primary", use_container_width=True):
+                if st.button(f"🌍 Expand to all of {user_country}", type="primary", use_container_width=True):
                     # Widen search: set state to "Any" and re-run
                     profile_data = load_json(PROFILE_FILE)
                     if profile_data:
@@ -1003,19 +722,19 @@ else:
                     st.rerun()
     
     elif st.session_state.get("_matching_running"):
-        st.warning("Matching in progress... This may take 30-60 seconds.")
+        st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
     
     else:
         country = profile.get("country", "India")
         st.markdown(f"""
         **Ready to find your next role?**
         
-        We will scan **6 sources** - WeWorkRemotely, RemoteOK, Remotive, Lever, 
-        and **Google Jobs** (LinkedIn, Indeed, Naukri) focused on **{country}** - 
+        We'll scan **6 sources** — WeWorkRemotely, RemoteOK, Remotive, Lever, 
+        and **Google Jobs** (LinkedIn, Indeed, Naukri) focused on **{country}** — 
         then rank the best matches using AI.
         """)
         
-        if st.button(" Start Job Matching", type="primary", use_container_width=True):
+        if st.button("🚀 Start Job Matching", type="primary", use_container_width=True):
             st.session_state["_matching_running"] = True
             
             # Progress UI
@@ -1063,7 +782,7 @@ else:
             progress_callback._max_pct = 0
             
             try:
-                status_text.info(" Scanning 6 job sources and running AI matching...")
+                status_text.info("🔍 Scanning 6 job sources and running AI matching...")
                 
                 result = run_auto_apply_pipeline(
                     profile_file=PROFILE_FILE,
@@ -1080,11 +799,11 @@ else:
                 st.session_state.pop("_matching_running", None)
                 
                 if result and result.get("status") == "success":
-                    status_text.success(f" Found {result['matches']} matches from {result['total_scored']} jobs!")
+                    status_text.success(f"✅ Found {result['matches']} matches from {result['total_scored']} jobs!")
                 elif result and result.get("status") == "no_matches":
-                    status_text.warning(" No strong matches found. Try broadening your skills or check back later.")
+                    status_text.warning("⚠️ No strong matches found. Try broadening your skills or check back later.")
                 else:
-                    status_text.error(f" Pipeline error: {result}")
+                    status_text.error(f"❌ Pipeline error: {result}")
                 
                 time.sleep(1)
                 st.rerun()
@@ -1092,7 +811,7 @@ else:
             except Exception as e:
                 st.session_state.pop("_matching_running", None)
                 progress_bar.progress(1.0, text="Error")
-                status_text.error(f" Error: {e}")
+                status_text.error(f"❌ Error: {e}")
                 st.exception(e)
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -1150,19 +869,19 @@ if isinstance(matches_data, list) and matches_data:
     if letter_files:
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.markdown(f"###  Your Top {len(matches_data)} Matches")
+            st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
         with col2:
             zip_data = build_zip(LETTERS_DIR)
             st.download_button(
-                f" Download {len(letter_files)} Letters",
+                f"📦 Download {len(letter_files)} Letters",
                 data=zip_data,
                 file_name="jobbot_cover_letters.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
     else:
-        st.markdown(f"###  Your Top {len(matches_data)} Matches")
-        st.caption(" Click 'Generate Letter' on any job to create a tailored cover letter")
+        st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
+        st.caption("💡 Click 'Generate Letter' on any job to create a tailored cover letter")
     
     # Job cards
     for i, job in enumerate(matches_data, 1):
@@ -1174,21 +893,21 @@ if isinstance(matches_data, list) and matches_data:
         
         # Score badge
         if score >= 75:
-            badge_emoji = ""
+            badge_emoji = "🔥"
             badge_class = "score-excellent"
         elif score >= 60:
-            badge_emoji = ""
+            badge_emoji = "⭐"
             badge_class = "score-good"
         else:
-            badge_emoji = ""
+            badge_emoji = "👍"
             badge_class = "score-fair"
         
-        with st.expander(f"#{i} · {badge_emoji} {company}  {title} ({score}%)"):
+        with st.expander(f"#{i} · {badge_emoji} {company} — {title} ({score}%)"):
             col1, col2 = st.columns([3, 1])
             
             with col1:
                 st.markdown(f"**{title}**")
-                st.markdown(f" **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
+                st.markdown(f"🏢 **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
                 
                 # Job location and experience info
                 job_location = job.get("location", "")
@@ -1201,13 +920,13 @@ if isinstance(matches_data, list) and matches_data:
                 
                 info_parts = []
                 if job_location:
-                    info_parts.append(f" {job_location}")
+                    info_parts.append(f"📍 {job_location}")
                 # Try to extract experience from summary
                 import re as _re
                 exp_match = _re.search(r'(\d+)\+?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)?', 
                                        job.get("summary", "").lower())
                 if exp_match:
-                    info_parts.append(f" {exp_match.group(0).strip()}")
+                    info_parts.append(f"📅 {exp_match.group(0).strip()}")
                 
                 if info_parts:
                     st.caption(" · ".join(info_parts))
@@ -1223,12 +942,12 @@ if isinstance(matches_data, list) and matches_data:
                     unsafe_allow_html=True
                 )
                 if job.get("apply_url"):
-                    st.link_button(" Apply Now", job["apply_url"], use_container_width=True)
+                    st.link_button("🔗 Apply Now", job["apply_url"], use_container_width=True)
                 
                 # Per-job cover letter button
                 letter_content, letter_fname = find_cover_letter(company, title)
                 if not letter_content:
-                    if st.button(" Generate Letter", key=f"gen_{i}", use_container_width=True):
+                    if st.button("📝 Generate Letter", key=f"gen_{i}", use_container_width=True):
                         with st.spinner("Writing cover letter..."):
                             try:
                                 os.makedirs(LETTERS_DIR, exist_ok=True)
@@ -1242,10 +961,10 @@ if isinstance(matches_data, list) and matches_data:
             letter_content, letter_fname = find_cover_letter(company, title)
             if letter_content:
                 st.markdown("---")
-                st.markdown('<p class="cover-letter-label"> Tailored Cover Letter</p>', unsafe_allow_html=True)
+                st.markdown('<p class="cover-letter-label">📝 Tailored Cover Letter</p>', unsafe_allow_html=True)
                 st.markdown(f'<div class="cover-letter-box">{letter_content}</div>', unsafe_allow_html=True)
                 st.download_button(
-                    " Download Letter",
+                    "📥 Download Letter",
                     data=letter_content,
                     file_name=letter_fname or f"cover_letter_{i}.txt",
                     mime="text/plain",
@@ -1259,7 +978,7 @@ if isinstance(matches_data, list) and matches_data:
 
 st.markdown("""
 <div class="footer">
-    Built with  using Streamlit & Gemini 2.5 Flash<br>
+    Built with ❤️ using Streamlit & Gemini 2.5 Flash<br>
     <a href="https://github.com" target="_blank">View on GitHub</a> · 
     <a href="#" onclick="alert('Feature coming soon!')">Report Bug</a>
 </div>
