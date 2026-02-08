@@ -286,7 +286,7 @@ def fetch_lever_jobs(companies: list = None, max_per_company: int = LEVER_PER_CO
     return all_jobs
 
 # ============================================
-# SERPERDEV GOOGLE JOBS API - FIXED
+# SERPERDEV GOOGLE JOBS API - CORRECTED ENDPOINT
 # ============================================
 def build_serper_queries_from_profile(profile: dict) -> tuple:
     """
@@ -351,8 +351,8 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
 
 def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
     """
-    Fetch jobs from Google Jobs via SerperDev API.
-    FIXED: Uses correct /search endpoint with type='jobs' parameter.
+    Fetch jobs from Google Jobs via Serper.dev API.
+    FIXED: Uses correct serper.dev endpoint (NOT google.serper.dev)
     """
     if not SERPER_API_KEY:
         logger.warning("SerperDev: No API key found, skipping")
@@ -385,15 +385,15 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
         try:
             logger.info(f"SerperDev Google Jobs: '{query}'" + (f" in {location}" if location else ""))
 
-            # FIXED: Use correct endpoint
-            url = "https://google.serper.dev/search"
+            # FIXED: Correct endpoint is serper.dev (NOT google.serper.dev)
+            url = "https://serper.dev/search"
 
-            # FIXED: Add type='jobs' parameter
+            # Correct payload structure
             payload = {
-                "q": query,
-                "type": "jobs",  # This tells SerperDev to search jobs
+                "q": query + (f" jobs in {location}" if location else " jobs"),
+                "type": "jobs",
                 "location": location if location else "India",
-                "num": 100,
+                "num": 100
             }
 
             headers = {
@@ -414,7 +414,7 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
                 logger.warning(f"SerperDev: Bad request for query '{query}' - {response.text[:200]}")
                 continue
             elif response.status_code == 404:
-                logger.error(f"SerperDev: 404 error - Check API endpoint. Response: {response.text[:200]}")
+                logger.error(f"SerperDev: 404 error - Wrong endpoint. Response: {response.text[:200]}")
                 continue
 
             response.raise_for_status()
@@ -485,6 +485,7 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
                     job["location_tags"] = extract_location_from_job(job)
                     jobs.append(job)
                     added += 1
+
                 except Exception as e:
                     logger.debug(f"Error parsing SerperDev job result: {e}")
                     continue
