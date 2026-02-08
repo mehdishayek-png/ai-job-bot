@@ -1,243 +1,421 @@
 import streamlit as st
-import json, os, re, uuid, time, io, zipfile
+import json
+import os
+import re
+import uuid
+import time
+import io
+import zipfile
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
 
-st.set_page_config(page_title="JobBot - AI Job Matching", page_icon="🚀", layout="wide", initial_sidebar_state="collapsed")
+# ============================================
+# PAGE CONFIG — MUST BE FIRST
+# ============================================
 
-# ==============================================
-# CSS — Addresses ALL visibility / contrast bugs
-# ==============================================
+st.set_page_config(
+    page_title="JobBot · AI-Powered Job Matching",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# ============================================
+# CUSTOM CSS — 2026 Glassmorphism + Modern Design
+# ============================================
+
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-:root {
-    --primary: #7c3aed; --primary-hover: #6d28d9;
-    --accent-coral: #f43f5e; --accent-emerald: #10b981; --accent-amber: #f59e0b;
-    --bg: #fafaf9; --card: #ffffff; --elevated: #f5f5f4;
-    --text: #1c1917; --text2: #57534e; --muted: #a8a29e;
-    --border: #e7e5e4; --r: 12px;
-}
-.stApp { font-family:'Plus Jakarta Sans',sans-serif!important; background:var(--bg)!important; }
-h1,h2,h3,h4,h5,h6 { font-family:'Plus Jakarta Sans',sans-serif!important; font-weight:800!important; color:var(--text)!important; }
-p,li,span,div { font-family:'Plus Jakarta Sans',sans-serif!important; }
+/* ============ GLOBAL ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* ===== HERO ===== */
-.hero{background:linear-gradient(135deg,#7c3aed 0%,#a78bfa 35%,#f43f5e 100%);border-radius:20px;padding:2.8rem 2.2rem;margin-bottom:1.5rem;position:relative;overflow:hidden;box-shadow:0 8px 32px rgba(124,58,237,0.25)}
-.hero h1{color:#fff!important;font-size:2.6rem!important;margin:0 0 .5rem 0!important}
-.hero-sub{color:rgba(255,255,255,.9);font-size:1.05rem;margin:0 0 1.4rem;font-weight:500;line-height:1.6;max-width:600px}
-.hero-tags{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
-.hero-tag{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);color:#fff;padding:.45rem .9rem;border-radius:8px;font-size:.78rem;font-weight:600}
-
-/* ===== STEPPER ===== */
-.stepper{display:flex;justify-content:center;align-items:center;gap:.75rem;margin:1.5rem 0 2rem;padding:1rem;background:var(--card);border:1px solid var(--border);border-radius:16px}
-.step{display:flex;align-items:center;gap:.5rem;padding:.5rem .8rem;border-radius:var(--r);font-size:.85rem;font-weight:600;color:var(--muted)}
-.step-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700}
-.step.done{color:var(--accent-emerald)} .step.done .step-num{background:var(--accent-emerald);color:#fff}
-.step.active{color:var(--primary);background:var(--primary);background:rgba(124,58,237,.08)} .step.active .step-num{background:var(--primary);color:#fff}
-.step.pending .step-num{background:var(--elevated);border:2px dashed var(--border);color:var(--muted)}
-.step-conn{width:40px;height:2px;background:var(--border)}
-
-/* ===== STATS ===== */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;margin:1.5rem 0}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.2rem 1rem;text-align:center}
-.stat-val{font-size:2rem;font-weight:800;line-height:1;margin-bottom:.3rem}
-.stat-val.purple{color:var(--primary)} .stat-val.coral{color:var(--accent-coral)}
-.stat-val.emerald{color:var(--accent-emerald)} .stat-val.amber{color:var(--accent-amber)}
-.stat-lbl{color:var(--muted);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
-
-/* ===== BADGES ===== */
-.score-badge{display:inline-block;padding:.4rem 1rem;border-radius:100px;font-size:.95rem;font-weight:700}
-.score-excellent{background:#d1fae5;color:#059669;border:1px solid #a7f3d0}
-.score-good{background:#fef3c7;color:#d97706;border:1px solid #fde68a}
-.score-fair{background:#ede9fe;color:#7c3aed;border:1px solid #ddd6fe}
-.src-badge{display:inline-block;padding:.15rem .5rem;border-radius:100px;font-size:.65rem;font-weight:700;text-transform:uppercase;background:var(--elevated);color:var(--text2);border:1px solid var(--border)}
-.ts-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.15rem .5rem;border-radius:100px;font-size:.65rem;font-weight:700}
-.ts-fresh{background:#d1fae5;color:#059669;border:1px solid #a7f3d0}
-.ts-recent{background:#fed7aa;color:#ea580c;border:1px solid #fdba74}
-.ts-old{background:var(--elevated);color:var(--muted);border:1px solid var(--border)}
-.pin-badge{display:inline-flex;padding:.15rem .5rem;border-radius:100px;font-size:.65rem;font-weight:700;background:#fecaca;color:#ef4444;border:1px solid #fca5a5}
-
-/* ===== SKILL CHIPS ===== */
-.skills-wrap{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.75rem}
-.sc{padding:.3rem .7rem;border-radius:100px;font-size:.78rem;font-weight:600}
-.sc:nth-child(5n+1){background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe}
-.sc:nth-child(5n+2){background:#fef2f2;color:#ef4444;border:1px solid #fecaca}
-.sc:nth-child(5n+3){background:#ecfdf5;color:#059669;border:1px solid #a7f3d0}
-.sc:nth-child(5n+4){background:#fff7ed;color:#ea580c;border:1px solid #fed7aa}
-.sc:nth-child(5n+5){background:#f0f9ff;color:#0284c7;border:1px solid #bae6fd}
-
-/* ========================================================
-   FIX 1: BUTTONS — white text on purple, high contrast
-   ======================================================== */
-.stButton > button {
-    background: var(--primary) !important; color: #ffffff !important;
-    border: none !important; border-radius: var(--r) !important;
-    padding: .65rem 1.25rem !important; font-weight: 700 !important;
-    font-size: .9rem !important; box-shadow: 0 2px 8px rgba(124,58,237,.2) !important;
-}
-.stButton > button:hover { background: var(--primary-hover) !important; }
-.stButton > button span, .stButton > button p { color: #ffffff !important; }
-
-/* ========================================================
-   FIX 2: EXPANDER — force light bg, dark text on header
-   The dark header + grey text issue; also fix arrow_right
-   ======================================================== */
-div[data-testid="stExpander"] {
-    border: 1px solid var(--border) !important;
-    border-radius: var(--r) !important;
-    background: var(--card) !important;
-    margin-bottom: .5rem !important;
-    overflow: hidden !important;
-}
-/* Force the expander HEADER (summary) to be LIGHT bg with DARK text */
-div[data-testid="stExpander"] > details > summary {
-    background: var(--card) !important;
-    color: var(--text) !important;
-    padding: .75rem 1rem !important;
-    font-weight: 600 !important;
-    border-bottom: 1px solid var(--border) !important;
-}
-div[data-testid="stExpander"] > details > summary span,
-div[data-testid="stExpander"] > details > summary p {
-    color: var(--text) !important;
-    -webkit-text-fill-color: var(--text) !important;
-}
-/* Fix the expanded content area too */
-div[data-testid="stExpander"] > details > div {
-    background: var(--card) !important;
-}
-div[data-testid="stExpander"] > details > div p,
-div[data-testid="stExpander"] > details > div span {
-    color: var(--text2) !important;
+.stApp {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f8f9fc;
 }
 
-/* ========================================================
-   FIX 3: Hide broken Material Icon text (arrow_right etc)
-   Streamlit 1.54 renders Material Symbols as text when
-   the font fails to load. Hide via font-family override.
-   ======================================================== */
-div[data-testid="stExpander"] summary svg { display: inline-block !important; }
-/* If icon text leaks, at least make it invisible */
-div[data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
-    font-size: 0 !important;
-    width: 24px !important;
-    height: 24px !important;
-    overflow: hidden !important;
-}
-
-/* ========================================================
-   FIX 4: INPUTS — visible text, visible cursor
-   ======================================================== */
-.stTextInput > div > div > input, .stTextArea > div > div > textarea {
-    background: #ffffff !important; border: 1.5px solid var(--border) !important;
-    border-radius: var(--r) !important; color: var(--text) !important;
-    font-size: .9rem !important; font-weight: 500 !important;
-    caret-color: var(--primary) !important;
-    -webkit-text-fill-color: var(--text) !important;
-}
-.stTextInput > div > div > input:focus, .stTextArea > div > div > textarea:focus {
-    border-color: var(--primary) !important;
-    box-shadow: 0 0 0 3px rgba(124,58,237,.12) !important;
-}
-.stTextInput input::placeholder, .stTextArea textarea::placeholder {
-    color: var(--muted) !important; -webkit-text-fill-color: var(--muted) !important; opacity:1!important;
-}
-
-/* ========================================================
-   FIX 5: SELECTBOX / DROPDOWN — light bg, dark text
-   This fixes the black dropdown with invisible text
-   ======================================================== */
-.stSelectbox > div > div,
-.stMultiSelect > div > div,
-div[data-baseweb="select"] {
-    background: #ffffff !important;
-    border: 1.5px solid var(--border) !important;
-    border-radius: var(--r) !important;
-}
-div[data-baseweb="select"] span,
-div[data-baseweb="select"] div,
-.stSelectbox [data-baseweb="select"] * {
-    color: var(--text) !important;
-    -webkit-text-fill-color: var(--text) !important;
-}
-/* Dropdown MENU (the popup list) — force light */
-div[data-baseweb="popover"],
-div[data-baseweb="popover"] ul,
-div[data-baseweb="popover"] li,
-ul[role="listbox"],
-ul[role="listbox"] li,
-div[data-baseweb="menu"] {
-    background: #ffffff !important;
-    color: var(--text) !important;
-}
-ul[role="listbox"] li:hover,
-div[data-baseweb="menu"] li:hover {
-    background: var(--elevated) !important;
-    color: var(--text) !important;
-}
-/* Selected option highlight */
-ul[role="listbox"] li[aria-selected="true"],
-div[data-baseweb="menu"] li[aria-selected="true"] {
-    background: var(--primary) !important;
-    color: #ffffff !important;
-}
-
-/* ========================================================
-   FIX 6: FILE UPLOADER — visible browse button
-   ======================================================== */
-.stFileUploader > div {
-    border: 2px dashed var(--border) !important;
-    border-radius: var(--r) !important;
-    background: var(--elevated) !important;
-}
-.stFileUploader button {
-    background: var(--primary) !important;
-    color: #ffffff !important;
-    border: none !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-}
-.stFileUploader [data-testid="stFileUploaderDropzone"] p,
-.stFileUploader [data-testid="stFileUploaderDropzone"] span,
-.stFileUploader [data-testid="stFileUploaderDropzone"] small {
-    color: var(--text2) !important;
-}
-
-/* ===== MISC ===== */
-label { color: var(--text) !important; font-weight: 600 !important; font-size: .85rem !important; }
-.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:2rem 0}
-.cover-letter-box{background:var(--elevated);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;margin-top:.75rem;color:var(--text2);line-height:1.75;font-size:.88rem}
-.cover-letter-label{color:var(--primary);font-weight:700;font-size:.82rem;text-transform:uppercase}
-.footer{text-align:center;padding:2rem 1rem;margin-top:3rem;color:var(--muted);font-size:.78rem;border-top:1px solid var(--border)}
-.footer a{color:var(--primary);text-decoration:none;font-weight:700}
-section[data-testid="stSidebar"]{background:var(--card);border-right:1px solid var(--border)}
-.stMarkdown,.stMarkdown p{color:var(--text2)!important} .stMarkdown strong,.stMarkdown b{color:var(--text)!important}
-.stAlert p{color:inherit!important}
-.stProgress > div > div > div{background:var(--primary)!important}
-a{color:var(--primary)} a:hover{color:var(--primary-hover)}
-
-/* Link buttons should have visible text */
-.stLinkButton > a {
-    background: var(--card) !important;
-    color: var(--primary) !important;
-    border: 1.5px solid var(--primary) !important;
-    border-radius: var(--r) !important;
+h1, h2, h3, h4, h5, h6,
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
-}
-.stLinkButton > a:hover {
-    background: var(--primary) !important;
-    color: #ffffff !important;
+    letter-spacing: -0.02em;
+    color: #1a1a2e !important;
 }
 
-/* Download buttons */
-.stDownloadButton > button {
-    background: var(--accent-emerald) !important;
-    color: #ffffff !important;
+p, li, span, div { color: #3d3d56; }
+
+code, .stCode, pre {
+    font-family: 'JetBrains Mono', monospace !important;
 }
+
+/* ============ HERO ============ */
+.hero {
+    background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 60%, #74b9ff 100%);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(108, 92, 231, 0.2);
+}
+
+.hero::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -15%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+    filter: blur(40px);
+}
+
+.hero-content { position: relative; z-index: 1; }
+
+.hero h1 {
+    color: #ffffff !important;
+    font-size: 2.5rem !important;
+    font-weight: 800 !important;
+    margin: 0 0 0.4rem 0 !important;
+    line-height: 1.1;
+}
+
+.hero-subtitle {
+    color: rgba(255,255,255,0.85);
+    font-size: 1.05rem;
+    margin: 0 0 1.2rem 0;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.hero-tags {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.hero-tag {
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 0.4rem 0.85rem;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* ============ STEPPER ============ */
+.stepper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.5rem 0 2rem;
+    padding: 1rem;
+    background: #fff;
+    border: 1px solid #e8e8f0;
+    border-radius: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #6c6c8a;
+}
+
+.step-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.step.done { color: #059669; }
+.step.done .step-icon {
+    background: #059669;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(5,150,105,0.25);
+}
+
+.step.active {
+    color: #6c5ce7;
+    background: #f0edff;
+}
+.step.active .step-icon {
+    background: #6c5ce7;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(108,92,231,0.3);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.step.pending { color: #c0c0d0; }
+.step.pending .step-icon {
+    background: #f0f0f5;
+    border: 2px dashed #d0d0dd;
+}
+
+.step-connector {
+    width: 40px; height: 2px;
+    background: #e0e0ea;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+/* ============ CARDS ============ */
+.glass-card {
+    background: #ffffff;
+    border: 1px solid #e8e8f0;
+    border-radius: 16px;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.glass-card:hover {
+    border-color: #d0cfe8;
+    box-shadow: 0 4px 16px rgba(108,92,231,0.08);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+
+.card-icon {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    background: #f0edff;
+    border: 1px solid #e0dcf5;
+}
+
+.card-title {
+    font-size: 1.2rem !important;
+    font-weight: 700 !important;
+    color: #1a1a2e !important;
+    margin: 0 !important;
+}
+
+/* ============ SKILL CHIPS ============ */
+.skills-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.skill-chip {
+    background: #f0edff;
+    border: 1px solid #e0dcf5;
+    color: #6c5ce7;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+/* ============ STATS ============ */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.stat-card {
+    background: #fff;
+    border: 1px solid #e8e8f0;
+    border-radius: 14px;
+    padding: 1.25rem 1rem;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #6c5ce7;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+}
+
+.stat-label {
+    color: #8888a0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ============ SCORE BADGES ============ */
+.score-badge {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.score-excellent {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+}
+.score-good {
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid #fde68a;
+}
+.score-fair {
+    background: #f0edff;
+    color: #6c5ce7;
+    border: 1px solid #e0dcf5;
+}
+
+/* ============ SOURCE BADGES ============ */
+.source-badge {
+    display: inline-block;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #eef2ff;
+    color: #6366f1;
+    border: 1px solid #ddd6fe;
+}
+
+/* ============ BUTTONS ============ */
+.stButton > button {
+    background: #6c5ce7 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.65rem 1.25rem !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(108,92,231,0.2) !important;
+}
+
+.stButton > button:hover {
+    background: #5b4bd5 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(108,92,231,0.3) !important;
+}
+
+/* ============ EXPANDERS (job cards) ============ */
+.streamlit-expanderHeader {
+    background: #fff !important;
+    border: 1px solid #e8e8f0 !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    color: #1a1a2e !important;
+}
+
+/* ============ INPUTS ============ */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div {
+    background: #fff !important;
+    border: 1px solid #e0e0ea !important;
+    border-radius: 10px !important;
+    color: #1a1a2e !important;
+}
+
+/* ============ DIVIDER ============ */
+.divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, #e0e0ea 50%, transparent 100%);
+    margin: 2rem 0;
+}
+
+/* ============ COVER LETTER ============ */
+.cover-letter-box {
+    background: #f8f8fc;
+    border: 1px solid #e8e8f0;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-top: 0.75rem;
+    color: #3d3d56;
+    line-height: 1.7;
+    font-size: 0.9rem;
+}
+
+.cover-letter-label {
+    color: #6c5ce7;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ============ SCROLLBAR ============ */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f0f0f5; }
+::-webkit-scrollbar-thumb { background: #d0cfe8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #b0afd0; }
+
+/* ============ FOOTER ============ */
+.footer {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    margin-top: 3rem;
+    color: #999;
+    font-size: 0.8rem;
+    border-top: 1px solid #e8e8f0;
+}
+.footer a { color: #6c5ce7; text-decoration: none; font-weight: 600; }
+.footer a:hover { color: #5b4bd5; }
+
+/* ============ SIDEBAR ============ */
+section[data-testid="stSidebar"] {
+    background: #fff;
+    border-right: 1px solid #e8e8f0;
+}
+section[data-testid="stSidebar"] * { color: #3d3d56; }
+
+/* ============ STREAMLIT OVERRIDES ============ */
+/* Fix text colors in expanders, markdown, captions */
+.stMarkdown, .stMarkdown p, .stCaption, .stText { color: #3d3d56 !important; }
+.stAlert p { color: inherit !important; }
+label, .stSelectbox label, .stTextInput label, .stTextArea label { color: #3d3d56 !important; }
+
+/* Expander content readability */
+div[data-testid="stExpander"] details summary span { color: #1a1a2e !important; }
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #3d3d56 !important; }
+
+/* Progress bar */
+.stProgress > div > div > div { background: #6c5ce7 !important; }
+
+/* Links */
+a { color: #6c5ce7; }
+a:hover { color: #5b4bd5; }
+
+/* Code blocks in progress */
+.stCodeBlock, pre { background: #f8f8fc !important; color: #3d3d56 !important; }
 </style>
-""", unsafe_allow_html=True)
 
 # ============================================
 # IMPORTS
