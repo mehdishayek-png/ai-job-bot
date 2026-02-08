@@ -59,7 +59,7 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # Falls back to mistral if gemini fails
 MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "100"))  # Show all qualifying jobs
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
