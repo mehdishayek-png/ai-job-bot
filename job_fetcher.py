@@ -110,10 +110,12 @@ LEVER_COMPANIES = [
 ]
 LEVER_PER_COMPANY = 20
 
-# API query limits (balanced across 3 APIs)
-SERPER_QUERIES = 4
-JSEARCH_QUERIES = 3
-SERPAPI_QUERIES = 3
+# API query limits (rebalanced for local prioritization)
+# When prioritizing local: SerpAPI and JSearch get more queries (better local results)
+# When remote-first: balanced distribution
+SERPER_QUERIES = 3  # Reduced from 4 (free tier has limits)
+JSEARCH_QUERIES = 3  # Good for local jobs
+SERPAPI_QUERIES = 3  # Best for local Google Jobs results
 
 __all__ = ['fetch_all', 'build_queries_from_profile', 'SERPER_QUERIES', 'JSEARCH_QUERIES', 'SERPAPI_QUERIES']
 
@@ -628,22 +630,36 @@ def fetch_all(output_path: str = None, profile: dict = None,
     except Exception as e:
         logger.error(f"Remotive failed: {e}")
 
-    # Layer 6: RSS feeds
+    # Layer 6: RSS feeds (CONDITIONAL - only fetch some if prioritizing local)
+    # Remote RSS feeds (WWR, RemoteOK) tend to dominate results, so limit them when user wants local jobs
     logger.info("Fetching RSS feeds")
+    
+    if prioritize_local:
+        # When prioritizing local, only fetch 2 WWR categories and skip RemoteOK
+        logger.info("Local prioritization enabled - limiting remote RSS feeds")
+        wwr_feeds_to_fetch = WWR_FEEDS[:2]  # Only programming and customer support
+    else:
+        # Fetch all RSS feeds when user is remote-first
+        wwr_feeds_to_fetch = WWR_FEEDS
 
-    for feed_url in WWR_FEEDS:
+    for feed_url in wwr_feeds_to_fetch:
         try:
             jobs = parse_rss(feed_url, "WeWorkRemotely")
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"Failed to fetch {feed_url}: {e}")
 
-    try:
-        jobs = parse_rss(REMOTEOK, "RemoteOK")
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"RemoteOK failed: {e}")
+    # Only fetch RemoteOK if NOT prioritizing local (it's 95+ jobs of pure remote)
+    if not prioritize_local:
+        try:
+            jobs = parse_rss(REMOTEOK, "RemoteOK")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"RemoteOK failed: {e}")
+    else:
+        logger.info("Skipping RemoteOK (prioritizing local jobs)")
 
+    # Jobicy is smaller and often local, so always fetch
     try:
         jobs = parse_rss(JOBICY, "Jobicy")
         all_jobs.extend(jobs)
