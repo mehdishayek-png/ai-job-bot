@@ -606,7 +606,7 @@ with st.sidebar:
     st.caption("💡 **For Support:** Share this Session ID if you encounter issues")
     
     # Log file location info
-    log_path = os.path.join(DATA_DIR, "pipeline.log")
+    log_path = os.path.join(DD, "pipeline.log")
     st.caption(f"📁 **Logs:** `{log_path}`")
     
     if st.button("🔄 Start Fresh Session", use_container_width=True):
@@ -637,7 +637,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🐛 Debug Info")
-    st.caption(f"**Data Directory:** `{DATA_DIR}`")
+    st.caption(f"**Data Directory:** `{DD}`")
     st.caption(f"**Profile:** {'✅ Loaded' if profile else '❌ Missing'}")
     st.caption(f"**Matches:** {len(matches) if matches else 0} found")
     if os.path.exists(log_path):
