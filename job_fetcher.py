@@ -49,8 +49,12 @@ def load_api_key(key_name):
 
 # Load all API keys
 SERPER_API_KEY = load_api_key("SERPER_API_KEY")
-JSEARCH_API_KEY = load_api_key("JSEARCH_API_KEY")
-SERPAPI_API_KEY = load_api_key("SERPAPI_API_KEY")
+
+# JSearch uses RapidAPI - try both key names for compatibility
+JSEARCH_API_KEY = load_api_key("JSEARCH_API_KEY") or load_api_key("RAPIDAPI_KEY")
+
+# SerpAPI - try both with and without _API suffix
+SERPAPI_API_KEY = load_api_key("SERPAPI_API_KEY") or load_api_key("SERPAPI_KEY")
 
 # Log which keys are available
 logger.info("API Keys loaded:")
@@ -365,6 +369,14 @@ def build_queries_from_profile(profile: dict) -> tuple:
 
 def fetch_serperdev_jobs(queries: list, location: str = None) -> list:
     """Fetch jobs from SerperDev /jobs endpoint"""
+    # NOTE: Serper.dev free tier doesn't support /jobs endpoint
+    # This endpoint requires a paid plan. Disabling to avoid 404 errors.
+    # Use the search_orchestrator.py upgrade for proper Serper integration.
+    logger.info("SerperDev: Skipping (free tier doesn't support /jobs endpoint)")
+    return []
+    
+    # ORIGINAL CODE DISABLED BELOW:
+    """
     if not SERPER_API_KEY:
         logger.warning("SerperDev: No API key found")
         return []
