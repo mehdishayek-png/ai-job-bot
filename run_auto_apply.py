@@ -63,7 +63,7 @@ MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
-MATCH_THRESHOLD = 35      # Local score threshold — be generous, let LLM decide
+MATCH_THRESHOLD = 25      # Lower threshold - was too aggressive at 35
 MAX_PER_COMPANY = 3       # Company diversity cap
 
 
@@ -777,8 +777,8 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     all_results.extend(scored_results)
 
     # ---- Phase 3: Filter, diversify, sort ----
-    # Adaptive threshold: try 55, then 50, then 45 to ensure we always return something
-    for threshold in [55, 50, 45]:
+    # Adaptive threshold: try 50, then 45, then 40 to ensure we always return something
+    for threshold in [50, 45, 40]:
         matches = []
         for job, score in all_results:
             if score >= threshold:
