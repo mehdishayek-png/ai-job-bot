@@ -63,7 +63,7 @@ MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
-MATCH_THRESHOLD = 35      # Local score threshold — be generous, let LLM decide
+MATCH_THRESHOLD = 25      # LOWERED: Was 35, reduced until SerperDev/RSS fixes boost job count
 MAX_PER_COMPANY = 3       # Company diversity cap
 
 

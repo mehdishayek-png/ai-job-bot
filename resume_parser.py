@@ -108,9 +108,9 @@ def extract_profile_with_llm(text):
 
 1. name: Full name of the candidate
 2. headline: Current job title or professional headline (e.g. "Business Operations Lead" or "IT Consultant")
-3. skills: List of 8-15 SPECIFIC, SEARCHABLE professional skills that a recruiter would use as keywords
+3. skills: List of 12-20 SPECIFIC, SEARCHABLE professional skills that a recruiter would use as keywords
 4. industry: The primary industry/domain (e.g. "fintech", "e-commerce", "healthcare", "SaaS")
-5. search_terms: 3-5 job title variations this person would search for on job boards
+5. search_terms: 5-8 job title variations this person would search for on job boards
 
 SKILLS RULES — read carefully:
 - Extract DOMAIN-SPECIFIC skills, NOT generic ones
@@ -122,12 +122,23 @@ SKILLS RULES — read carefully:
 - DO NOT include generic office tools: "Microsoft Office", "Excel", "PowerPoint", "Word"
 - DO NOT include languages spoken
 - Each skill should realistically appear in a job posting the candidate would apply to
+- IMPORTANT: Aim for 12-20 skills (was 8-15). More keywords = better job matching!
+- If in doubt, include it — better to have more keywords for matching
+
+SKILLS EXTRACTION STRATEGY:
+- Start with obvious domain skills (e.g., "Salesforce", "JIRA", "payment processing")
+- Add functional skills (e.g., "vendor management", "process automation")
+- Include industry-specific skills (e.g., "fintech operations", "SaaS")
+- Add soft skills only if highly relevant (e.g., "stakeholder management" for leadership roles)
+- Aim for variety: tools + domains + methodologies + platforms
+- Extract both specific (e.g., "UPI integration") and general (e.g., "payments") terms
 
 SEARCH_TERMS RULES:
 - These are job TITLES the person would search for, not skills
 - Think: what would this person type into LinkedIn/Indeed/Naukri?
 - GOOD: ["Business Operations Manager", "Fintech Operations Lead", "Payment Operations Manager", "Operations Manager fintech"]
 - BAD: ["API integration jobs", "lead jobs"] (too vague)
+- IMPORTANT: Provide 5-8 variations (was 3-5) to maximize job discovery
 
 Return ONLY a JSON object:
 {{"name": "...", "headline": "...", "skills": [...], "industry": "...", "search_terms": [...]}}

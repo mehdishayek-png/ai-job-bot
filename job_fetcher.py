@@ -106,11 +106,11 @@ LEVER_PER_COMPANY = 20
 SERPER_MAX_QUERIES = 12
 SERPER_NUM_RESULTS = 100
 
-# --- ScrapingDog: Direct job board scraping ---
-# ScrapingDog credits: 1000 free/month on basic plan
-# Use as backup when SerperDev hits limits or for additional coverage
-SCRAPINGDOG_MAX_SCRAPES = 8  # Conservative to preserve credits
-SCRAPINGDOG_ENABLED = True  # Can be toggled
+# --- ScrapingDog: DISABLED (unreliable, returning 400 errors) ---
+# Returning 400 errors consistently for Indeed/Naukri
+# Use SerperDev + RSS feeds instead which are more reliable
+SCRAPINGDOG_MAX_SCRAPES = 0  # Disabled
+SCRAPINGDOG_ENABLED = False  # Use SerperDev + RSS instead
 
 # Export for run_auto_apply.py
 __all__ = ['fetch_all', 'build_serper_queries_from_profile', 'SERPER_MAX_QUERIES']
@@ -373,8 +373,10 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
 
 def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
     """
-    Fetch ACTUAL JOB POSTINGS from Google Jobs via SerperDev.
-    Uses type="jobs" to get real job postings, not search results.
+    Fetch jobs from Google Jobs via SerperDev API.
+    Uses the dedicated /jobs endpoint for reliable job search results.
+    
+    FIXED: Changed from /search to /jobs endpoint to avoid 404 errors.
     """
     if not SERPER_API_KEY:
         logger.warning("SerperDev: No API key found, skipping")
@@ -408,15 +410,14 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
         try:
             logger.info(f"SerperDev Google Jobs: '{query}'" + (f" in {location}" if location else ""))
             
-            url = "https://google.serper.dev/search"
+            # CRITICAL FIX: Use /jobs endpoint, not /search
+            url = "https://google.serper.dev/jobs"
             
+            # CRITICAL FIX: Simplified payload - no "type" field needed
             payload = {
                 "q": query,
                 "location": location if location else "India",
-                "gl": "in",
-                "hl": "en",
-                "num": SERPER_NUM_RESULTS,
-                "type": "jobs",  # CRITICAL: Gets actual job postings
+                "num": 100,  # Max results per query
             }
             
             headers = {
@@ -434,12 +435,16 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
                 logger.error("SerperDev: Invalid API key or quota exhausted")
                 break
             elif response.status_code == 400:
-                logger.warning(f"SerperDev: Bad request for query '{query}'")
+                logger.warning(f"SerperDev: Bad request for query '{query}' - {response.text[:200]}")
+                continue
+            elif response.status_code == 404:
+                logger.error(f"SerperDev: 404 error - Check API endpoint. Response: {response.text[:200]}")
                 continue
             
             response.raise_for_status()
             data = response.json()
             
+            # Jobs are in 'jobs' array
             job_results = data.get("jobs", [])
             
             if not job_results:
@@ -450,30 +455,44 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
             for result in job_results:
                 try:
                     title = result.get("title", "").strip()
-                    company_name = result.get("company", {}).get("name", "") if isinstance(result.get("company"), dict) else result.get("company", "Unknown")
+                    
+                    # Handle company field (can be string or dict)
+                    company_raw = result.get("company", "Unknown")
+                    if isinstance(company_raw, dict):
+                        company_name = company_raw.get("name", "Unknown")
+                    else:
+                        company_name = str(company_raw) if company_raw else "Unknown"
+                    
                     description = result.get("description", "").strip()
                     link = result.get("link", "").strip()
                     job_location = result.get("location", "")
-                    posted_date = result.get("detected_extensions", {}).get("posted_at", "") or result.get("posted_at", "")
+                    
+                    # Get posting date
+                    detected_ext = result.get("detected_extensions", {})
+                    posted_date = detected_ext.get("posted_at", "") if detected_ext else ""
+                    if not posted_date:
+                        posted_date = result.get("posted_at", "")
                     
                     if not title or not link:
                         continue
                     
                     # Determine source from link
                     source_name = "Google Jobs"
-                    if "linkedin.com" in link:
+                    link_lower = link.lower()
+                    if "linkedin.com" in link_lower:
                         source_name = "LinkedIn"
-                    elif "naukri.com" in link:
+                    elif "naukri.com" in link_lower:
                         source_name = "Naukri"
-                    elif "indeed.com" in link:
+                    elif "indeed.com" in link_lower:
                         source_name = "Indeed"
-                    elif "glassdoor.com" in link:
+                    elif "glassdoor.com" in link_lower:
                         source_name = "Glassdoor"
-                    elif "instahyre.com" in link:
+                    elif "instahyre.com" in link_lower:
                         source_name = "Instahyre"
-                    elif "foundit.in" in link:
+                    elif "foundit.in" in link_lower:
                         source_name = "Foundit"
                     
+                    # Skip duplicates
                     if link in seen_urls:
                         continue
                     seen_urls.add(link)
@@ -498,6 +517,7 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
             
             logger.info(f"SerperDev: '{query}' → {added} jobs")
             
+            # Rate limiting between queries
             if searches_used < len(query_strings):
                 time.sleep(0.5)
         
@@ -513,276 +533,29 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
 
 
 # ============================================
-# SCRAPINGDOG - DIRECT JOB BOARD SCRAPING
+# SCRAPINGDOG - REMOVED (unreliable, 400 errors)
 # ============================================
 
-def fetch_scrapingdog_jobs(queries: list = None, location: str = None) -> list:
-    """
-    Scrape job boards directly using ScrapingDog API.
-    
-    ScrapingDog provides:
-    - Direct scraping of Naukri, Indeed, LinkedIn job pages
-    - Bypasses anti-scraping measures
-    - Returns clean HTML for parsing
-    
-    Use cases:
-    - Backup when SerperDev hits limits
-    - Additional coverage from job boards
-    - Get jobs that don't appear in Google Jobs
-    
-    Credits: 1000 free/month on basic plan
-    """
-    if not SCRAPINGDOG_API_KEY:
-        logger.warning("ScrapingDog: No API key found, skipping")
-        return []
-    
-    if not SCRAPINGDOG_ENABLED:
-        logger.info("ScrapingDog: Disabled in config")
-        return []
-    
-    if not queries:
-        logger.warning("ScrapingDog: No queries provided")
-        return []
-    
-    logger.info(f"ScrapingDog: Starting direct job board scraping")
-    
-    jobs = []
-    seen_urls = set()
-    scrapes_used = 0
-    
-    # Determine location for URLs
-    loc_str = location.lower().replace(" ", "-") if location else "india"
-    if "bangalore" in loc_str or "bengaluru" in loc_str:
-        loc_str = "bangalore"
-    
-    # Build target URLs for top queries
-    # We'll scrape Naukri and Indeed (most reliable for India)
-    target_urls = []
-    
-    for query in queries[:SCRAPINGDOG_MAX_SCRAPES // 2]:  # Split credits between boards
-        # Clean query for URL
-        q_clean = query.lower().replace(" ", "-")
-        
-        # Naukri.com URL
-        naukri_url = f"https://www.naukri.com/{q_clean}-jobs-in-{loc_str}"
-        target_urls.append(("Naukri", naukri_url, query))
-        
-        # Indeed.in URL
-        indeed_q = quote_plus(query)
-        indeed_loc = quote_plus(location if location else "India")
-        indeed_url = f"https://in.indeed.com/jobs?q={indeed_q}&l={indeed_loc}"
-        target_urls.append(("Indeed", indeed_url, query))
-    
-    # Limit total scrapes
-    target_urls = target_urls[:SCRAPINGDOG_MAX_SCRAPES]
-    
-    for source, url, query in target_urls:
-        if scrapes_used >= SCRAPINGDOG_MAX_SCRAPES:
-            logger.info(f"ScrapingDog: Reached scrape limit ({SCRAPINGDOG_MAX_SCRAPES})")
-            break
-        
-        try:
-            logger.info(f"ScrapingDog: Scraping {source} for '{query}'")
-            
-            # Build ScrapingDog API URL
-            params = {
-                'api_key': SCRAPINGDOG_API_KEY,
-                'url': url,
-                'dynamic': 'false',  # Static scraping (faster, uses fewer credits)
-            }
-            
-            scrapingdog_url = f"https://api.scrapingdog.com/scrape?{urlencode(params)}"
-            
-            response = requests.get(scrapingdog_url, timeout=45)
-            scrapes_used += 1
-            
-            if response.status_code == 403:
-                logger.error("ScrapingDog: Invalid API key or quota exhausted")
-                break
-            elif response.status_code == 429:
-                logger.warning("ScrapingDog: Rate limit hit")
-                break
-            elif response.status_code != 200:
-                logger.warning(f"ScrapingDog: Failed to scrape {source} (status {response.status_code})")
-                continue
-            
-            # Parse HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Parse based on source
-            if source == "Naukri":
-                jobs_found = parse_naukri_html(soup, seen_urls)
-            elif source == "Indeed":
-                jobs_found = parse_indeed_html(soup, seen_urls)
-            else:
-                jobs_found = []
-            
-            jobs.extend(jobs_found)
-            logger.info(f"ScrapingDog: {source} → {len(jobs_found)} jobs")
-            
-            # Delay between scrapes
-            if scrapes_used < len(target_urls):
-                time.sleep(2)
-        
-        except Exception as e:
-            logger.error(f"ScrapingDog: Error scraping {source}: {e}")
-            continue
-    
-    logger.info(f"ScrapingDog total: {len(jobs)} jobs ({scrapes_used} scrapes used of {SCRAPINGDOG_MAX_SCRAPES} max)")
-    return jobs
-
-
-def parse_naukri_html(soup: BeautifulSoup, seen_urls: set) -> list:
-    """Parse Naukri.com job listings from HTML."""
-    jobs = []
-    
-    try:
-        # Naukri uses article tags with class "jobTuple"
-        job_cards = soup.find_all('article', class_='jobTuple')
-        
-        for card in job_cards[:20]:  # Limit per page
-            try:
-                # Title
-                title_elem = card.find('a', class_='title')
-                if not title_elem:
-                    continue
-                title = title_elem.get_text(strip=True)
-                link = "https://www.naukri.com" + title_elem.get('href', '')
-                
-                if link in seen_urls:
-                    continue
-                seen_urls.add(link)
-                
-                # Company
-                company_elem = card.find('a', class_='comp-name')
-                company = company_elem.get_text(strip=True) if company_elem else "Unknown"
-                
-                # Location
-                location_elem = card.find('li', class_='location')
-                location = location_elem.get_text(strip=True) if location_elem else ""
-                
-                # Experience
-                exp_elem = card.find('li', class_='experience')
-                experience = exp_elem.get_text(strip=True) if exp_elem else ""
-                
-                # Description
-                desc_elem = card.find('div', class_='job-description')
-                description = desc_elem.get_text(strip=True) if desc_elem else ""
-                
-                # Build job object
-                job = {
-                    "title": title,
-                    "company": company,
-                    "summary": f"{description[:400]} Experience: {experience}".strip(),
-                    "apply_url": link,
-                    "source": "Naukri",
-                    "location": location,
-                    "posted_date": "",  # Naukri doesn't always show this
-                }
-                
-                job["location_tags"] = extract_location_from_job(job)
-                jobs.append(job)
-            
-            except Exception as e:
-                logger.debug(f"Error parsing Naukri job card: {e}")
-                continue
-    
-    except Exception as e:
-        logger.error(f"Error parsing Naukri HTML: {e}")
-    
-    return jobs
-
-
-def parse_indeed_html(soup: BeautifulSoup, seen_urls: set) -> list:
-    """Parse Indeed.in job listings from HTML."""
-    jobs = []
-    
-    try:
-        # Indeed uses div tags with class "job_seen_beacon"
-        job_cards = soup.find_all('div', class_='job_seen_beacon')
-        
-        for card in job_cards[:20]:
-            try:
-                # Title and link
-                title_elem = card.find('h2', class_='jobTitle')
-                if not title_elem:
-                    continue
-                
-                link_elem = title_elem.find('a')
-                if not link_elem:
-                    continue
-                
-                title = title_elem.get_text(strip=True)
-                job_id = link_elem.get('data-jk', '')
-                link = f"https://in.indeed.com/viewjob?jk={job_id}" if job_id else ""
-                
-                if not link or link in seen_urls:
-                    continue
-                seen_urls.add(link)
-                
-                # Company
-                company_elem = card.find('span', class_='companyName')
-                company = company_elem.get_text(strip=True) if company_elem else "Unknown"
-                
-                # Location
-                location_elem = card.find('div', class_='companyLocation')
-                location = location_elem.get_text(strip=True) if location_elem else ""
-                
-                # Description
-                desc_elem = card.find('div', class_='job-snippet')
-                description = desc_elem.get_text(strip=True) if desc_elem else ""
-                
-                # Posted date
-                date_elem = card.find('span', class_='date')
-                posted_date = date_elem.get_text(strip=True) if date_elem else ""
-                
-                # Build job object
-                job = {
-                    "title": title,
-                    "company": company,
-                    "summary": description[:500],
-                    "apply_url": link,
-                    "source": "Indeed",
-                    "location": location,
-                    "posted_date": posted_date,
-                }
-                
-                job["location_tags"] = extract_location_from_job(job)
-                jobs.append(job)
-            
-            except Exception as e:
-                logger.debug(f"Error parsing Indeed job card: {e}")
-                continue
-    
-    except Exception as e:
-        logger.error(f"Error parsing Indeed HTML: {e}")
-    
-    return jobs
-
-
-# ============================================
-# MAIN FETCH FUNCTION
-# ============================================
-
+# ScrapingDog was removed because:
 def fetch_all(output_path: str = None, serper_queries: list = None, 
-              prioritize_local: bool = False, location: str = None,
-              use_scrapingdog: bool = True) -> list:
+              prioritize_local: bool = False, location: str = None) -> list:
     """
     Fetch jobs from all sources with multi-layer search strategy.
     
-    Search layers (in order):
-    1. SerperDev Google Jobs API (primary, fast)
-    2. ScrapingDog direct scraping (backup/supplement)
-    3. Lever API (tech companies)
-    4. Remotive API (curated remote)
-    5. RSS feeds (if not prioritizing local)
+    FIXED: Always fetch RSS feeds (they're free and high quality!)
+    Just reorder results to prioritize local jobs when requested.
+    
+    Search layers (in order when prioritize_local=True):
+    1. SerperDev Google Jobs API (local/targeted)
+    2. Lever API (tech companies)
+    3. Remotive API (curated remote)
+    4. RSS feeds (WeWorkRemotely, RemoteOK, Jobicy) - ALWAYS FETCHED
     
     Args:
         output_path: Path to save jobs JSON file
         serper_queries: Profile-based queries
-        prioritize_local: If True, skip large remote-only RSS feeds
+        prioritize_local: If True, fetch local sources first (but still fetch RSS!)
         location: User's location for targeted searches
-        use_scrapingdog: Enable ScrapingDog as backup (default: True)
     
     Returns:
         list: All fetched jobs with location_tags
@@ -794,41 +567,53 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
     logger.info("Starting multi-layer job fetch from all sources")
 
     if prioritize_local:
-        logger.info("Prioritizing local sources: SerperDev → ScrapingDog → Lever")
+        logger.info("Prioritizing local sources first, then fetching global sources")
         
-        # Layer 1: SerperDev (primary, fastest)
+        # Layer 1: SerperDev (local/targeted)
         try:
             jobs = fetch_serperdev_jobs(queries=serper_queries, location=location)
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"Failed to fetch SerperDev: {e}")
         
-        # Layer 2: ScrapingDog (backup/supplement)
-        if use_scrapingdog and SCRAPINGDOG_API_KEY:
-            try:
-                jobs = fetch_scrapingdog_jobs(queries=serper_queries, location=location)
-                all_jobs.extend(jobs)
-            except Exception as e:
-                logger.error(f"Failed to fetch ScrapingDog: {e}")
-        
-        # Layer 3: Lever (tech companies)
+        # Layer 2: Lever (tech companies)
         try:
             jobs = fetch_lever_jobs()
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"Failed to fetch Lever: {e}")
         
-        # Layer 4: Remotive (curated remote)
+        # Layer 3: Remotive (curated remote)
         try:
             jobs = fetch_remotive_jobs()
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"Failed to fetch Remotive: {e}")
         
-        logger.info("Skipped large remote-only RSS feeds to favor local sources")
+        # Layer 4: RSS FEEDS (ALWAYS FETCH - they're free and high quality!)
+        logger.info("Fetching RSS feeds (will reorder local jobs to top later)")
+        
+        for feed_url in WWR_FEEDS:
+            try:
+                jobs = parse_rss(feed_url, "WeWorkRemotely")
+                all_jobs.extend(jobs)
+            except Exception as e:
+                logger.error(f"Failed to fetch {feed_url}: {e}")
+        
+        try:
+            jobs = parse_rss(REMOTEOK, "RemoteOK")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch RemoteOK: {e}")
+        
+        try:
+            jobs = parse_rss(JOBICY, "Jobicy")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch Jobicy: {e}")
 
     else:
-        # Full fetch including RSS feeds
+        # Full fetch including RSS feeds (no prioritization)
         for feed_url in WWR_FEEDS:
             try:
                 jobs = parse_rss(feed_url, "WeWorkRemotely")
