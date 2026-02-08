@@ -46,6 +46,10 @@ h1, h2, h3, h4, h5, h6,
 
 p, li, span, div { color: #3d3d56; }
 
+.stApp span, .stApp p, .stApp li, .stApp div {
+    color: #1a1a2e !important;
+}
+
 code, .stCode, pre {
     font-family: 'JetBrains Mono', monospace !important;
 }
@@ -225,11 +229,19 @@ code, .stCode, pre {
     border: 2px dashed #d0cfe8 !important;
     border-radius: 12px !important;
     transition: all 0.3s ease !important;
+    color: #1a1a2e !important;
 }
 
 .stFileUploader section:hover {
     border-color: #6c5ce7 !important;
     background: linear-gradient(135deg, #f0edff 0%, #e8e3ff 100%) !important;
+    color: #1a1a2e !important;
+}
+
+.stFileUploader section p,
+.stFileUploader section span,
+.stFileUploader section div {
+    color: #1a1a2e !important;
 }
 
 /* ============ PROFILE BOX ============ */
