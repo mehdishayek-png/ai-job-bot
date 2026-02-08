@@ -444,15 +444,48 @@ label, .stSelectbox label, .stTextInput label, .stTextArea label { color: #3d3d5
 div[data-testid="stExpander"] details summary span { color: #1a1a2e !important; }
 div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #3d3d56 !important; }
 
-/* Progress bar */
-.stProgress > div > div > div { background: #6c5ce7 !important; }
+/* ============ CODE BLOCKS & PROGRESS - IMPROVED ============ */
+/* Light gradient background instead of dark/black */
+.stCodeBlock, pre, code { 
+    background: linear-gradient(135deg, #f0edff 0%, #eef2ff 100%) !important; 
+    color: #3d3d56 !important;
+    border: 1px solid #e0dcf5 !important;
+    border-radius: 8px !important;
+    font-family: 'DM Sans', monospace !important;
+    padding: 0.75rem 1rem !important;
+}
+
+/* Progress bar with gradient matching hero */
+.stProgress > div > div > div { 
+    background: linear-gradient(135deg, #6c5ce7 0%, #74b9ff 100%) !important; 
+    border-radius: 10px !important;
+}
 
 /* Links */
-a { color: #6c5ce7; }
-a:hover { color: #5b4bd5; }
+a { color: #6c5ce7; text-decoration: none; }
+a:hover { color: #5b4bd5; text-decoration: underline; }
 
-/* Code blocks in progress */
-.stCodeBlock, pre { background: #f8f8fc !important; color: #3d3d56 !important; }
+/* Info/Warning/Error boxes - match theme */
+.stAlert {
+    border-radius: 12px !important;
+    border-left: 4px solid #6c5ce7 !important;
+    font-family: 'DM Sans', sans-serif !important;
+}
+
+/* ENSURE DM SANS EVERYWHERE - override Streamlit defaults */
+.stMarkdown, .stMarkdown p, .stMarkdown li, .stMarkdown span,
+.stTextInput, .stTextArea, .stSelectbox, .stMultiSelect, .stNumberInput,
+div[data-testid="stMarkdownContainer"],
+div[data-testid="stMarkdownContainer"] *,
+.stCaption, .element-container * {
+    font-family: 'DM Sans', sans-serif !important;
+}
+
+/* Captions - consistent styling */
+.stCaption {
+    color: #8888a0 !important;
+    font-size: 0.85rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -565,19 +598,51 @@ def jkey(j): return f"{j.get('company','')}__{j.get('title','')}__{j.get('apply_
 # ============================================
 # SIDEBAR
 # ============================================
+# SIDEBAR - SESSION INFO & DEBUGGING
+# ============================================
 with st.sidebar:
-    st.markdown("### Session")
-    st.caption(f"ID: `{SID}`")
-    if st.button("Start Fresh", use_container_width=True):
+    st.markdown("### 🔍 Session Info")
+    st.code(f"Session ID: {SID}", language=None)
+    st.caption("💡 **For Support:** Share this Session ID if you encounter issues")
+    
+    # Log file location info
+    log_path = os.path.join(DATA_DIR, "pipeline.log")
+    st.caption(f"📁 **Logs:** `{log_path}`")
+    
+    if st.button("🔄 Start Fresh Session", use_container_width=True):
         for k in list(st.session_state.keys()): del st.session_state[k]
         st.rerun()
+    
     st.markdown("---")
-    st.markdown("### How It Works")
-    st.markdown("**1.** Upload resume\n\n**2.** Scans 6+ job sources\n\n**3.** AI ranks matches\n\n**4.** Generate cover letters")
+    st.markdown("### 🎯 How It Works")
+    st.markdown("""
+    **1.** Upload resume → Extract skills  
+    **2.** Scan 300+ jobs from 6 sources  
+    **3.** AI ranks by match quality  
+    **4.** Generate cover letters on demand
+    """)
+    
     st.markdown("---")
-    st.markdown("### Sources")
-    for s in ["Google Jobs (Serper.dev)","Indeed, Naukri, Glassdoor","LinkedIn, Instahyre","Lever (50+ companies)","Remotive","WeWorkRemotely / RemoteOK"]:
-        st.caption(f"- {s}")
+    st.markdown("### 📊 Job Sources")
+    sources_info = [
+        ("🌐 Google Jobs", "via Serper.dev"),
+        ("💼 LinkedIn, Indeed", "Local + Remote"),
+        ("🇮🇳 Naukri, Glassdoor", "India-focused"),
+        ("🏢 Lever", "50+ tech companies"),
+        ("🌍 Remotive", "Curated remote"),
+        ("💻 WeWorkRemotely", "Remote-first")
+    ]
+    for name, desc in sources_info:
+        st.caption(f"{name} · *{desc}*")
+    
+    st.markdown("---")
+    st.markdown("### 🐛 Debug Info")
+    st.caption(f"**Data Directory:** `{DATA_DIR}`")
+    st.caption(f"**Profile:** {'✅ Loaded' if profile else '❌ Missing'}")
+    st.caption(f"**Matches:** {len(matches) if matches else 0} found")
+    if os.path.exists(log_path):
+        st.caption(f"**Log Size:** {os.path.getsize(log_path) // 1024}KB")
+
 
 # ============================================
 # HERO
