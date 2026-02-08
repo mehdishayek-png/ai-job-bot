@@ -498,11 +498,11 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     if not os.path.exists(jobs_file):
         if progress_callback:
             progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
-        from job_fetcher import fetch_all, build_serpapi_queries
+        from job_fetcher import fetch_all, build_queries_from_profile
 
-        # Generate profile-based SerpAPI queries for India-focused search
-        serpapi_queries = build_serpapi_queries(profile)
-        logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
+        # Generate profile-based queries for job search
+        queries, location = build_queries_from_profile(profile)
+        logger.info(f"Search queries: {queries}, location: {location}")
 
         # Determine whether to prioritize local sources based on profile location preferences
         location_prefs = profile.get("location_preferences", ["global"])
@@ -513,7 +513,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         if prioritize_local:
             logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
 
-        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
+        fetch_all(output_path=jobs_file, profile=profile, prioritize_local=prioritize_local)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
