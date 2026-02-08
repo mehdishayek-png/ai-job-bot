@@ -666,7 +666,7 @@ with st.sidebar:
 st.markdown("""
 <div class="hero">
     <div class="hero-content">
-        <h1>🚀 Job AI Search</h1>
+        <h1> Job AI Search</h1>
         <p class="hero-subtitle">
             Intelligent job matching powered by AI. Upload your resume, set your preferences, and discover opportunities tailored specifically for you.
         </p>
