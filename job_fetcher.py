@@ -32,14 +32,16 @@ RETRY_DELAY = 2  # seconds
 # ============================================
 # API KEYS (env or Streamlit secrets)
 # ============================================
+# JSearch is BEST for jobs (Google Jobs, LinkedIn, Indeed, etc.)
+JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
+# SerperDev is for general web search (not optimized for structured job data)
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
-SCRAPINGDOG_API_KEY = os.getenv("SCRAPINGDOG_API_KEY", "")
 
-if not SERPER_API_KEY or not SCRAPINGDOG_API_KEY:
+if not JSEARCH_API_KEY or not SERPER_API_KEY:
     try:
         import streamlit as _st
+        JSEARCH_API_KEY = JSEARCH_API_KEY or _st.secrets.get("JSEARCH_API_KEY", "")
         SERPER_API_KEY = SERPER_API_KEY or _st.secrets.get("SERPER_API_KEY", "")
-        SCRAPINGDOG_API_KEY = SCRAPINGDOG_API_KEY or _st.secrets.get("SCRAPINGDOG_API_KEY", "")
     except (ImportError, KeyError, AttributeError):
         pass
 
@@ -95,13 +97,7 @@ LEVER_COMPANIES = [
 ]
 LEVER_PER_COMPANY = 20
 
-# --- SerperDev: Google JOBS search ---
-SERPER_MAX_QUERIES = 12
-SERPER_NUM_RESULTS = 100
-
-# --- ScrapingDog: DISABLED ---
-SCRAPINGDOG_MAX_SCRAPES = 0
-SCRAPINGDOG_ENABLED = False
+SERPER_MAX_QUERIES = 10  # Limit for API usage
 
 # Export for run_auto_apply.py
 __all__ = ['fetch_all', 'build_serper_queries_from_profile', 'SERPER_MAX_QUERIES']
@@ -286,11 +282,11 @@ def fetch_lever_jobs(companies: list = None, max_per_company: int = LEVER_PER_CO
     return all_jobs
 
 # ============================================
-# SERPERDEV GOOGLE JOBS API - CORRECTED ENDPOINT
+# JSEARCH API (Replaces SerperDev for Jobs)
 # ============================================
 def build_serper_queries_from_profile(profile: dict) -> tuple:
     """
-    Generate targeted SerperDev Google Jobs queries from user profile.
+    Generate targeted queries from user profile.
     Returns (queries, location) tuple.
     """
     headline = (profile.get("headline", "") or "").strip()
@@ -303,7 +299,7 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
     # Determine if remote-only
     is_remote_only = country.lower() in ("remote only", "remote", "global")
 
-    # Build location string for Google Jobs API
+    # Build location string
     location = None
     if not is_remote_only:
         if state and state != "Any":
@@ -325,18 +321,12 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
     # Priority 3: Industry combinations
     if industry:
         queries.append(f"{industry} jobs")
-        if headline:
-            queries.append(f"{headline} {industry}")
 
     # Priority 4: Top 2 skills
     if skills:
         for skill in skills[:2]:
             if len(skill.split()) <= 3:
                 queries.append(f"{skill} specialist")
-
-    # Priority 5: Remote variations
-    if search_terms:
-        queries.append(f"remote {search_terms[0]}")
 
     # Deduplicate and limit
     seen = set()
@@ -349,20 +339,21 @@ def build_serper_queries_from_profile(profile: dict) -> tuple:
 
     return unique_queries[:SERPER_MAX_QUERIES], location
 
-def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
+def fetch_jsearch_jobs(queries: list = None, location: str = None) -> list:
     """
-    Fetch jobs from Google Jobs via Serper.dev API.
-    FIXED: Uses correct serper.dev endpoint (NOT google.serper.dev)
+    Fetch jobs from Google Jobs, LinkedIn, Indeed, Glassdoor via JSearch API (RapidAPI).
+    This is the RELIABLE way to get aggregated jobs (SerperDev doesn't support this well).
     """
-    if not SERPER_API_KEY:
-        logger.warning("SerperDev: No API key found, skipping")
+    if not JSEARCH_API_KEY:
+        logger.warning("JSearch: No API key found (add JSEARCH_API_KEY to .env or secrets), skipping")
         return []
 
     if not queries:
-        logger.warning("SerperDev: No queries provided")
+        logger.warning("JSearch: No queries provided")
         return []
 
-    # Convert old format to new if needed
+    # Standardize queries
+    query_strings = []
     if queries and isinstance(queries[0], dict):
         query_strings = [q.get("q", "") for q in queries if q.get("q")]
         if queries[0].get("location"):
@@ -370,112 +361,98 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
     else:
         query_strings = queries
 
-    query_strings = query_strings[:SERPER_MAX_QUERIES]
-    logger.info(f"SerperDev: Fetching jobs for {len(query_strings)} queries (location: {location or 'global'})")
+    # RapidAPI Free Tier = 100 requests/month. 
+    # We limit to 5 queries per run to be safe.
+    query_strings = query_strings[:5]
+
+    logger.info(f"JSearch: Fetching jobs for {len(query_strings)} queries (location: {location or 'India'})")
 
     jobs = []
     seen_urls = set()
     searches_used = 0
 
+    url = "https://jsearch.p.rapidapi.com/search"
+
+    headers = {
+        "X-RapidAPI-Key": JSEARCH_API_KEY,
+        "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+    }
+
     for query in query_strings:
-        if searches_used >= SERPER_MAX_QUERIES:
-            logger.info(f"SerperDev: Reached query limit ({SERPER_MAX_QUERIES})")
+        if searches_used >= 5:
+            logger.info("JSearch: Reached query limit for this run")
             break
 
         try:
-            logger.info(f"SerperDev Google Jobs: '{query}'" + (f" in {location}" if location else ""))
+            logger.info(f"JSearch: '{query}' in {location or 'India'}")
 
-            # FIXED: Correct endpoint is serper.dev (NOT google.serper.dev)
-            url = "https://serper.dev/search"
-
-            # Correct payload structure
-            payload = {
-                "q": query + (f" jobs in {location}" if location else " jobs"),
-                "type": "jobs",
-                "location": location if location else "India",
-                "num": 100
+            querystring = {
+                "query": f"{query} in {location or 'India'}",
+                "page": "1",
+                "num_pages": "1", 
+                "date_posted": "week" # Get fresh jobs
             }
 
-            headers = {
-                'X-API-KEY': SERPER_API_KEY,
-                'Content-Type': 'application/json'
-            }
-
-            response = requests.post(url, json=payload, headers=headers, timeout=NETWORK_TIMEOUT)
+            response = requests.get(url, headers=headers, params=querystring, timeout=NETWORK_TIMEOUT)
             searches_used += 1
 
             if response.status_code == 429:
-                logger.warning("SerperDev: Rate limit hit, stopping searches")
+                logger.warning("JSearch: Rate limit hit")
                 break
             elif response.status_code == 403:
-                logger.error("SerperDev: Invalid API key or quota exhausted")
+                logger.error("JSearch: Invalid API key")
                 break
-            elif response.status_code == 400:
-                logger.warning(f"SerperDev: Bad request for query '{query}' - {response.text[:200]}")
-                continue
-            elif response.status_code == 404:
-                logger.error(f"SerperDev: 404 error - Wrong endpoint. Response: {response.text[:200]}")
-                continue
 
             response.raise_for_status()
             data = response.json()
 
-            # Jobs are in 'jobs' array
-            job_results = data.get("jobs", [])
+            job_results = data.get("data", [])
 
             if not job_results:
-                logger.info(f"SerperDev: No jobs found for '{query}'")
+                logger.info(f"JSearch: No jobs found for '{query}'")
                 continue
 
             added = 0
             for result in job_results:
                 try:
-                    title = result.get("title", "").strip()
+                    title = result.get("job_title", "").strip()
+                    company = result.get("employer_name", "Unknown").strip()
+                    description = result.get("job_description", "").strip()
 
-                    # Handle company field (can be string or dict)
-                    company_raw = result.get("company", "Unknown")
-                    if isinstance(company_raw, dict):
-                        company_name = company_raw.get("name", "Unknown")
-                    else:
-                        company_name = str(company_raw) if company_raw else "Unknown"
+                    # Try getting apply link, fallback to google link
+                    link = result.get("job_apply_link")
+                    if not link:
+                         link = result.get("job_google_link", "")
 
-                    description = result.get("description", "").strip()
-                    link = result.get("link", "").strip()
-                    job_location = result.get("location", "")
+                    # Build location string
+                    loc_parts = []
+                    if result.get("job_city"): loc_parts.append(result.get("job_city"))
+                    if result.get("job_state"): loc_parts.append(result.get("job_state"))
+                    if result.get("job_country"): loc_parts.append(result.get("job_country"))
+                    job_location = ", ".join(loc_parts)
 
-                    # Get posting date
-                    detected_ext = result.get("detected_extensions", {})
-                    posted_date = detected_ext.get("posted_at", "") if detected_ext else ""
-                    if not posted_date:
-                        posted_date = result.get("posted_at", "")
+                    posted_date = result.get("job_posted_at_datetime_utc", "")
 
                     if not title or not link:
                         continue
 
-                    # Determine source from link
-                    source_name = "Google Jobs"
+                    # Determine source
+                    source_name = "Google Jobs" # Default
                     link_lower = link.lower()
-                    if "linkedin.com" in link_lower:
-                        source_name = "LinkedIn"
-                    elif "naukri.com" in link_lower:
-                        source_name = "Naukri"
-                    elif "indeed.com" in link_lower:
-                        source_name = "Indeed"
-                    elif "glassdoor.com" in link_lower:
-                        source_name = "Glassdoor"
-                    elif "instahyre.com" in link_lower:
-                        source_name = "Instahyre"
-                    elif "foundit.in" in link_lower:
-                        source_name = "Foundit"
+                    if "linkedin.com" in link_lower: source_name = "LinkedIn"
+                    elif "naukri.com" in link_lower: source_name = "Naukri"
+                    elif "indeed.com" in link_lower: source_name = "Indeed"
+                    elif "glassdoor.com" in link_lower: source_name = "Glassdoor"
+                    elif "foundit.in" in link_lower: source_name = "Foundit"
+                    elif "instahyre.com" in link_lower: source_name = "Instahyre"
 
-                    # Skip duplicates
                     if link in seen_urls:
                         continue
                     seen_urls.add(link)
 
                     job = {
                         "title": title,
-                        "company": company_name,
+                        "company": company,
                         "summary": strip_html(description[:500]),
                         "apply_url": link,
                         "source": source_name,
@@ -487,23 +464,20 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
                     added += 1
 
                 except Exception as e:
-                    logger.debug(f"Error parsing SerperDev job result: {e}")
+                    logger.debug(f"Error parsing JSearch result: {e}")
                     continue
 
-            logger.info(f"SerperDev: '{query}' → {added} jobs")
-
-            # Rate limiting between queries
-            if searches_used < len(query_strings):
-                time.sleep(0.5)
+            logger.info(f"JSearch: '{query}' → {added} jobs")
+            time.sleep(1) # Be nice to API
 
         except requests.Timeout:
-            logger.warning(f"SerperDev: Timeout for '{query}'")
+            logger.warning(f"JSearch: Timeout for '{query}'")
         except requests.RequestException as e:
-            logger.warning(f"SerperDev: Request failed: {e}")
+            logger.warning(f"JSearch: Request failed: {e}")
         except Exception as e:
-            logger.error(f"SerperDev: Unexpected error: {e}")
+            logger.error(f"JSearch: Unexpected error: {e}")
 
-    logger.info(f"SerperDev total: {len(jobs)} unique jobs ({searches_used} searches used of {SERPER_MAX_QUERIES} max)")
+    logger.info(f"JSearch total: {len(jobs)} unique jobs")
     return jobs
 
 # ============================================
@@ -512,7 +486,7 @@ def fetch_serperdev_jobs(queries: list = None, location: str = None) -> list:
 def fetch_all(output_path: str = None, serper_queries: list = None,
               prioritize_local: bool = False, location: str = None) -> list:
     """
-    Fetch jobs from all sources with multi-layer search strategy.
+    Fetch jobs from all sources.
     """
     output_path = output_path or OUTPUT_DEFAULT
     all_jobs = []
@@ -523,12 +497,14 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
     if prioritize_local:
         logger.info("Prioritizing local sources first, then fetching global sources")
 
-    # Layer 1: SerperDev (local/targeted)
+    # Layer 1: JSearch (The RELIABLE Google Jobs/LinkedIn aggregator)
+    # This replaces the broken SerperDev implementation
     try:
-        jobs = fetch_serperdev_jobs(queries=serper_queries, location=location)
+        # Note: We pass serper_queries here as they are just list of strings/dicts
+        jobs = fetch_jsearch_jobs(queries=serper_queries, location=location)
         all_jobs.extend(jobs)
     except Exception as e:
-        logger.error(f"Failed to fetch SerperDev: {e}")
+        logger.error(f"Failed to fetch JSearch: {e}")
 
     # Layer 2: Lever (tech companies)
     try:
@@ -584,16 +560,6 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
     for src, count in sorted(source_counts.items(), key=lambda x: -x[1]):
         logger.info(f"  {src}: {count}")
 
-    # Log location distribution
-    location_stats = {}
-    for job in all_jobs:
-        for tag in job.get("location_tags", ["global"]):
-            location_stats[tag] = location_stats.get(tag, 0) + 1
-
-    logger.info("Location distribution:")
-    for region, count in sorted(location_stats.items()):
-        logger.info(f"  {region}: {count} jobs")
-
     # Deduplicate jobs based on URL
     seen_urls = set()
     unique_jobs = []
@@ -605,7 +571,7 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
         elif not url:
             unique_jobs.append(job)
 
-    logger.info(f"Unique jobs after deduplication: {len(unique_jobs)} (removed {len(all_jobs) - len(unique_jobs)} duplicates)")
+    logger.info(f"Unique jobs after deduplication: {len(unique_jobs)}")
 
     # Save to file
     try:
@@ -625,8 +591,7 @@ if __name__ == "__main__":
         output = sys.argv[1] if len(sys.argv) > 1 else OUTPUT_DEFAULT
         test_queries = [
             "Customer Experience Specialist",
-            "Technical Support Specialist",
-            "SaaS Customer Support",
+            "Technical Support Specialist"
         ]
 
         jobs = fetch_all(
@@ -638,15 +603,6 @@ if __name__ == "__main__":
 
         print(f"\n✅ Successfully fetched {len(jobs)} unique jobs!")
         print(f"Saved to: {output}")
-
-        sources = {}
-        for job in jobs:
-            source = job.get("source", "Unknown")
-            sources[source] = sources.get(source, 0) + 1
-
-        print("\nBreakdown by source:")
-        for source, count in sorted(sources.items(), key=lambda x: -x[1]):
-            print(f"  {source}: {count} jobs")
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
