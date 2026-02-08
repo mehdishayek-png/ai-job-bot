@@ -41,6 +41,14 @@ if not SERPAPI_KEY:
     except (ImportError, KeyError, AttributeError):
         pass
 
+SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+if not SERPER_API_KEY:
+    try:
+        import streamlit as _st
+        SERPER_API_KEY = _st.secrets.get("SERPER_API_KEY", "")
+    except (ImportError, KeyError, AttributeError):
+        pass
+
 
 def strip_html(text: str) -> str:
     """Remove HTML tags and decode entities from text."""
@@ -307,6 +315,176 @@ def fetch_lever_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
 
 
 # ============================================
+# POSTED DATE PARSER
+# ============================================
+
+def _parse_posted_date_str(posted_str: str) -> str:
+    """Parse 'X days ago' / 'today' into ISO date string."""
+    from datetime import datetime, timedelta
+    if not posted_str:
+        return ""
+    posted_str = posted_str.lower().strip()
+    try:
+        if "today" in posted_str or "just" in posted_str:
+            return datetime.now().isoformat()
+        if "yesterday" in posted_str:
+            return (datetime.now() - timedelta(days=1)).isoformat()
+        import re as _re
+        m = _re.search(r'(\d+)\s*(hour|day|week|month)s?\s*ago', posted_str)
+        if m:
+            n, u = int(m.group(1)), m.group(2)
+            delta = {"hour": timedelta(hours=n), "day": timedelta(days=n),
+                     "week": timedelta(weeks=n), "month": timedelta(days=n*30)}
+            return (datetime.now() - delta.get(u, timedelta())).isoformat()
+    except Exception:
+        pass
+    return ""
+
+
+# ============================================
+# SERPER.DEV — Google Jobs (PRIMARY, 2500 free/month)
+# ============================================
+
+def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> list:
+    """
+    Fetch jobs from Serper.dev Google Jobs API.
+    PRIMARY provider — 2,500 free searches/month.
+    Falls back to SerpAPI if Serper is unavailable.
+    """
+    if not SERPER_API_KEY:
+        logger.info("Serper.dev: No API key set (SERPER_API_KEY), skipping")
+        return []
+
+    if not queries:
+        logger.info("Serper.dev: No queries provided, skipping")
+        return []
+
+    jobs = []
+    seen_titles = set()
+    searches_used = 0
+
+    for query_config in queries[:SERPAPI_MAX_QUERIES]:
+        try:
+            search_query = query_config.get("q", "")
+            if not search_query:
+                continue
+
+            headers = {
+                "X-API-KEY": SERPER_API_KEY,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "q": search_query,
+                "gl": "us",
+                "hl": "en",
+                "num": 10,
+            }
+            # Use location if provided
+            loc = query_config.get("location")
+            if loc and loc.lower() not in ("remote", "remote only", ""):
+                payload["gl"] = "in" if "india" in loc.lower() else "us"
+                payload["location"] = loc
+
+            logger.info(f"Serper.dev: Searching '{search_query}'")
+            response = requests.post(
+                "https://google.serper.dev/search",
+                json=payload, headers=headers, timeout=timeout
+            )
+            searches_used += 1
+
+            if response.status_code == 401:
+                logger.error("Serper.dev: Invalid API key")
+                break
+            if response.status_code == 429:
+                logger.warning("Serper.dev: Rate limit hit, stopping")
+                break
+            if response.status_code != 200:
+                logger.warning(f"Serper.dev: HTTP {response.status_code}")
+                continue
+
+            data = response.json()
+            added = 0
+
+            for result in data.get("organic", [])[:10]:
+                try:
+                    title = result.get("title", "").strip()
+                    link = result.get("link", "").strip()
+                    snippet = result.get("snippet", "").strip()
+
+                    if not title or not link:
+                        continue
+
+                    # Extract company from title
+                    company = "Unknown"
+                    job_title = title
+                    for sep in [" - ", " | ", " — ", " at "]:
+                        if sep in title:
+                            parts = title.split(sep, 1)
+                            if len(parts) == 2 and len(parts[0]) < 60:
+                                company = parts[0].strip()
+                                job_title = parts[1].strip()
+                                break
+
+                    dedup_key = f"{job_title.lower()}|{company.lower()}"
+                    if dedup_key in seen_titles:
+                        continue
+                    seen_titles.add(dedup_key)
+
+                    # Detect source from URL
+                    source_name = "Google Jobs"
+                    link_lower = link.lower()
+                    if "linkedin.com" in link_lower: source_name = "LinkedIn"
+                    elif "indeed.com" in link_lower: source_name = "Indeed"
+                    elif "naukri.com" in link_lower: source_name = "Naukri"
+                    elif "glassdoor" in link_lower: source_name = "Glassdoor"
+                    elif "foundit.in" in link_lower or "monster" in link_lower: source_name = "Foundit"
+                    elif "instahyre" in link_lower: source_name = "Instahyre"
+                    elif "wellfound" in link_lower or "angel.co" in link_lower: source_name = "Wellfound"
+                    elif "cutshort" in link_lower: source_name = "CutShort"
+                    elif "hirist" in link_lower: source_name = "Hirist"
+                    elif "jooble" in link_lower: source_name = "Jooble"
+
+                    job = {
+                        "title": job_title,
+                        "company": company,
+                        "summary": strip_html(snippet),
+                        "apply_url": link,
+                        "source": source_name,
+                    }
+
+                    # Try to extract posted date from snippet
+                    posted = _parse_posted_date_str(snippet)
+                    if posted:
+                        job["posted_date"] = posted
+
+                    # Also check the date field from Serper
+                    date_str = result.get("date", "")
+                    if date_str and not job.get("posted_date"):
+                        job["posted_date"] = _parse_posted_date_str(date_str)
+
+                    job["location_tags"] = extract_location_from_job(job)
+                    jobs.append(job)
+                    added += 1
+                except Exception:
+                    continue
+
+            logger.info(f"Serper.dev: '{search_query}' -> {added} new jobs")
+
+            if searches_used < len(queries):
+                time.sleep(0.5)
+
+        except requests.Timeout:
+            logger.warning(f"Serper.dev: Timeout for '{query_config.get('q', '?')}'")
+        except requests.RequestException as e:
+            logger.warning(f"Serper.dev: Request failed: {e}")
+        except Exception as e:
+            logger.error(f"Serper.dev: Unexpected error: {e}")
+
+    logger.info(f"Serper.dev total: {len(jobs)} unique jobs ({searches_used} searches)")
+    return jobs
+
+
+# ============================================
 # SERPAPI — Google Jobs (LinkedIn, Indeed, Naukri, Instahyre, Glassdoor)
 # ============================================
 
@@ -526,6 +704,11 @@ def fetch_serpapi_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> 
                         "apply_url": apply_url,
                         "source": source_name,
                     }
+                    # Extract posted_date from SerpAPI detected_extensions
+                    detected = jr.get("detected_extensions", {})
+                    posted_at = detected.get("posted_at", "")
+                    if posted_at:
+                        job["posted_date"] = _parse_posted_date_str(posted_at)
                     job["location_tags"] = extract_location_from_job(job)
                     jobs.append(job)
                     added += 1
@@ -582,13 +765,24 @@ def fetch_all(output_path: str = None, serpapi_queries: list = None, prioritize_
     # fetch SerpAPI (Google Jobs / Indeed / Naukri) first and avoid bulk remote
     # boards to increase the relative share of localized results.
     if prioritize_local:
-        logger.info("Prioritizing local sources: running SerpAPI and Lever first, skipping large remote-only feeds")
-        # 1. SerpAPI (targeted local searches)
+        logger.info("Prioritizing local sources: running Serper.dev/SerpAPI and Lever first, skipping large remote-only feeds")
+        # 1. Serper.dev FIRST (primary, 2500 free/month), then SerpAPI fallback
         try:
-            jobs = fetch_serpapi_jobs(queries=serpapi_queries)
-            all_jobs.extend(jobs)
+            jobs = fetch_serper_jobs(queries=serpapi_queries)
+            if jobs:
+                all_jobs.extend(jobs)
+                logger.info(f"Serper.dev provided {len(jobs)} jobs — skipping SerpAPI to save quota")
+            else:
+                logger.info("Serper.dev returned no results, falling back to SerpAPI")
+                jobs = fetch_serpapi_jobs(queries=serpapi_queries)
+                all_jobs.extend(jobs)
         except Exception as e:
-            logger.error(f"Failed to fetch SerpAPI: {e}")
+            logger.error(f"Failed to fetch from search providers: {e}")
+            try:
+                jobs = fetch_serpapi_jobs(queries=serpapi_queries)
+                all_jobs.extend(jobs)
+            except Exception as e2:
+                logger.error(f"SerpAPI fallback also failed: {e2}")
 
         # 2. Lever (targeted companies, many with India presence)
         try:
@@ -644,12 +838,22 @@ def fetch_all(output_path: str = None, serpapi_queries: list = None, prioritize_
         except Exception as e:
             logger.error(f"Failed to fetch Lever: {e}")
 
-        # ---- 6. SerpAPI → Google Jobs (LinkedIn, Indeed, Naukri, etc.) ----
+        # ---- 6. Serper.dev / SerpAPI → Google Jobs (LinkedIn, Indeed, Naukri, etc.) ----
         try:
-            jobs = fetch_serpapi_jobs(queries=serpapi_queries)
-            all_jobs.extend(jobs)
+            jobs = fetch_serper_jobs(queries=serpapi_queries)
+            if jobs:
+                all_jobs.extend(jobs)
+                logger.info(f"Serper.dev provided {len(jobs)} jobs — skipping SerpAPI")
+            else:
+                jobs = fetch_serpapi_jobs(queries=serpapi_queries)
+                all_jobs.extend(jobs)
         except Exception as e:
-            logger.error(f"Failed to fetch SerpAPI: {e}")
+            logger.error(f"Failed to fetch search jobs: {e}")
+            try:
+                jobs = fetch_serpapi_jobs(queries=serpapi_queries)
+                all_jobs.extend(jobs)
+            except Exception as e2:
+                logger.error(f"SerpAPI fallback failed: {e2}")
 
     # Check if we got any jobs
     if not all_jobs:
