@@ -9,18 +9,18 @@ import zipfile
 from dotenv import load_dotenv
 
 # ============================================
-# PAGE CONFIG — MUST BE FIRST
+# PAGE CONFIG  MUST BE FIRST
 # ============================================
 
 st.set_page_config(
     page_title="Job AI Search · Powered by AI",
-    page_icon="🚀",
+    page_icon="J",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # ============================================
-# CUSTOM CSS — Matching Design Image
+# CUSTOM CSS  Matching Design Image
 # ============================================
 
 st.markdown("""
@@ -516,7 +516,7 @@ section[data-testid="stSidebar"] * { color: #4A5568; }
 load_dotenv()
 
 # ============================================
-# MODULE RELOAD — Critical for Streamlit hot-reload
+# MODULE RELOAD  Critical for Streamlit hot-reload
 # ============================================
 import importlib
 import sys
@@ -631,17 +631,17 @@ def find_cover_letter(company, title):
 # ============================================
 
 with st.sidebar:
-    st.markdown("### 🎯 Session Control")
+    st.markdown("###  Session Control")
     st.caption(f"Session ID: `{SESSION_ID}`")
     
-    if st.button("🔄 Start Fresh Session", use_container_width=True):
+    if st.button(" Start Fresh Session", use_container_width=True):
         # Clear session state
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
     
     st.markdown("---")
-    st.markdown("### 📊 About JobBot")
+    st.markdown("###  About JobBot")
     st.markdown("""
     **How it works:**
     1. **Skills-based matching** - Extracts skills from your resume
@@ -651,7 +651,7 @@ with st.sidebar:
     """)
     
     st.markdown("---")
-    st.markdown("### 🔍 Job Sources")
+    st.markdown("###  Job Sources")
     st.markdown("""
     - WeWorkRemotely (6 categories)
     - RemoteOK
@@ -671,10 +671,10 @@ st.markdown("""
             Intelligent job matching powered by AI. Upload your resume, set your preferences, and discover opportunities tailored specifically for you.
         </p>
         <div class="hero-tags">
-            <span class="hero-tag">🔍 6 Job Sources</span>
-            <span class="hero-tag">🤖 AI-Powered Matching</span>
-            <span class="hero-tag">📄 Auto Cover Letters</span>
-            <span class="hero-tag">🌍 Global + Remote</span>
+            <span class="hero-tag">6 Job Sources</span>
+            <span class="hero-tag">AI-Powered Matching</span>
+            <span class="hero-tag">Auto Cover Letters</span>
+            <span class="hero-tag">Global + Remote</span>
         </div>
     </div>
 </div>
@@ -717,7 +717,7 @@ st.markdown(f"""
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown("""
 <div class="card-header">
-    <div class="card-icon">👤</div>
+    <div class="card-icon"></div>
     <h2 class="card-title">Step 1: Build Your Profile</h2>
 </div>
 """, unsafe_allow_html=True)
@@ -728,13 +728,13 @@ with col1:
     uploaded_resume = st.file_uploader(
         "Upload your resume (PDF)",
         type=["pdf"],
-        help="We'll extract your skills, experience, and headline automatically",
+        help="We will extract your skills, experience, and headline automatically",
         key="resume_upload"
     )
 
 with col2:
     if uploaded_resume:
-        if st.button("🔍 Parse Resume", type="primary", use_container_width=True):
+        if st.button(" Parse Resume", type="primary", use_container_width=True):
             with st.spinner("Analyzing your resume..."):
                 try:
                     # Save uploaded file
@@ -756,23 +756,23 @@ with col2:
                         # Set defaults if first time
                         profile.setdefault("country", "India")
                         profile.setdefault("state", "Any")
-                        profile.setdefault("experience", "3–6 years")
-                        profile.setdefault("job_preference", "🔀 Both (local + remote)")
+                        profile.setdefault("experience", "36 years")
+                        profile.setdefault("job_preference", " Both (local + remote)")
                         save_json(PROFILE_FILE, profile)
                     
-                    st.success("✅ Resume parsed successfully!")
+                    st.success(" Resume parsed successfully!")
                     time.sleep(0.5)
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"❌ Error parsing resume: {e}")
+                    st.error(f" Error parsing resume: {e}")
 
 # Display current profile
 profile = load_json(PROFILE_FILE)
 
 if profile and profile.get("skills"):
     st.markdown("---")
-    st.markdown(f"**👤 {profile.get('name', 'Candidate')}**")
+    st.markdown(f"** {profile.get('name', 'Candidate')}**")
     if profile.get('headline'):
         st.caption(profile['headline'])
     
@@ -780,7 +780,7 @@ if profile and profile.get("skills"):
     if skills:
         skills_html = "".join([f'<span class="skill-chip">{s}</span>' for s in skills])
         st.markdown(f'<div class="skills-container">{skills_html}</div>', unsafe_allow_html=True)
-        st.caption(f"💡 {len(skills)} skills detected - used for keyword matching")
+        st.caption(f" {len(skills)} skills detected - used for keyword matching")
 
     # Display location preferences
     country = profile.get("country", "")
@@ -789,19 +789,19 @@ if profile and profile.get("skills"):
         loc_display = country
         if state and state != "Any":
             loc_display += f" · {state}"
-        st.caption(f"📍 {loc_display}")
+        st.caption(f" {loc_display}")
     if profile.get("location_preferences"):
         prefs = profile["location_preferences"]
         pref_names = []
         name_map = {"americas": "Americas", "europe": "Europe", "asia": "Asia-Pacific", "global": "Global"}
         for p in prefs:
             pref_names.append(name_map.get(p, p.title()))
-        st.caption(f"📍 Regions: {', '.join(pref_names)}")
+        st.caption(f" Regions: {', '.join(pref_names)}")
 else:
-    st.info("👆 Upload your resume to get started, or create a profile manually below")
+    st.info(" Upload your resume to get started, or create a profile manually below")
 
 # Manual profile editing
-with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create Profile Manually"):
+with st.expander(" Edit Profile Manually" if profile else " Create Profile Manually"):
     name_input = st.text_input("Full Name", value=profile.get("name", "") if profile else "")
     headline_input = st.text_input("Professional Headline", value=profile.get("headline", "") if profile else "")
     skills_input = st.text_area(
@@ -811,7 +811,7 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
         help="Enter specific skills, tools, and technologies - these are used for matching"
     )
 
-    # Location selectors — country + state/city
+    # Location selectors  country + state/city
     COUNTRY_OPTIONS = [
         "India", "United States", "United Kingdom", "Canada", "Germany",
         "Australia", "UAE", "Saudi Arabia", "Singapore", "Netherlands",
@@ -844,10 +844,10 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
     loc_col1, loc_col2 = st.columns(2)
     with loc_col1:
         country_input = st.selectbox(
-            "📍 Country",
+            " Country",
             options=COUNTRY_OPTIONS,
             index=COUNTRY_OPTIONS.index(current_country) if current_country in COUNTRY_OPTIONS else 0,
-            help="We'll prioritize jobs in your country"
+            help="We will prioritize jobs in your country"
         )
     with loc_col2:
         state_list = STATE_OPTIONS.get(country_input, ["Any"])
@@ -855,7 +855,7 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
         if current_state not in state_list:
             current_state = "Any"
         state_input = st.selectbox(
-            "🏙️ State / City",
+            " State / City",
             options=state_list,
             index=state_list.index(current_state) if current_state in state_list else 0,
             help="Refines search queries for more local results"
@@ -864,32 +864,32 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
     # Experience and job preference
     exp_col1, exp_col2 = st.columns(2)
     with exp_col1:
-        EXP_OPTIONS = ["0–1 years", "1–3 years", "3–6 years", "6–10 years", "10+ years"]
-        current_exp = profile.get("experience", "3–6 years") if profile else "3–6 years"
+        EXP_OPTIONS = ["01 years", "13 years", "36 years", "610 years", "10+ years"]
+        current_exp = profile.get("experience", "36 years") if profile else "36 years"
         if current_exp not in EXP_OPTIONS:
-            current_exp = "3–6 years"
+            current_exp = "36 years"
         exp_input = st.selectbox(
-            "📅 Years of Experience",
+            " Years of Experience",
             options=EXP_OPTIONS,
             index=EXP_OPTIONS.index(current_exp),
             help="Used to filter out jobs too senior or too junior for you"
         )
     with exp_col2:
-        PREF_OPTIONS = ["🏙️ Local jobs in my city", "🌐 Remote jobs", "🔀 Both (local + remote)"]
-        current_pref = profile.get("job_preference", "🔀 Both (local + remote)") if profile else "🔀 Both (local + remote)"
+        PREF_OPTIONS = [" Local jobs in my city", " Remote jobs", " Both (local + remote)"]
+        current_pref = profile.get("job_preference", " Both (local + remote)") if profile else " Both (local + remote)"
         if current_pref not in PREF_OPTIONS:
-            current_pref = "🔀 Both (local + remote)"
+            current_pref = " Both (local + remote)"
         pref_input = st.selectbox(
-            "🎯 Job Preference",
+            " Job Preference",
             options=PREF_OPTIONS,
             index=PREF_OPTIONS.index(current_pref),
             help="Focus search on local city jobs, remote-only, or both"
         )
     
-    if st.button("💾 Save Profile", use_container_width=True):
+    if st.button(" Save Profile", use_container_width=True):
         skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
         if not skills_list and not name_input:
-            st.error("⚠️ Please enter at least a name or some skills")
+            st.error(" Please enter at least a name or some skills")
         else:
             # Preserve fields from LLM parsing that user doesn't edit
             existing = load_json(PROFILE_FILE) or {}
@@ -906,7 +906,7 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
                 "search_terms": existing.get("search_terms", []),
             }
             save_json(PROFILE_FILE, updated_profile)
-            st.success("✅ Profile saved!")
+            st.success(" Profile saved!")
             time.sleep(0.5)
             st.rerun()
 
@@ -920,7 +920,7 @@ st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown("""
 <div class="card-header">
-    <div class="card-icon">🎯</div>
+    <div class="card-icon"></div>
     <h2 class="card-title">Step 2: Job Matching</h2>
 </div>
 """, unsafe_allow_html=True)
@@ -929,10 +929,10 @@ profile = load_json(PROFILE_FILE)
 profile_ready = bool(profile and profile.get("skills"))
 
 if not profile_ready:
-    st.warning("⚠️ Please complete your profile above to unlock job matching")
+    st.warning(" Please complete your profile above to unlock job matching")
 else:
     # Explain matching process
-    with st.expander("ℹ️ How does matching work?"):
+    with st.expander("How does matching work?"):
         st.markdown("""
         **JobBot uses a 3-phase matching system:**
         
@@ -941,18 +941,18 @@ else:
         3. **AI Ranking** - Top 30-50 candidates sent to Gemini 2.5 Flash for final scoring
         
         **What we match on:**
-        - ✅ Your **skills** (primary signal - exact matches + variants)
-        - ✅ Your **headline** (job title/role context)
-        - ✅ Domain terms extracted from both
+        -  Your **skills** (primary signal - exact matches + variants)
+        -  Your **headline** (job title/role context)
+        -  Domain terms extracted from both
         
         **What we filter:**
-        - ❌ Non-English jobs
-        - ❌ Jobs too senior for your experience
-        - ❌ Duplicate postings across sources
+        -  Non-English jobs
+        -  Jobs too senior for your experience
+        -  Duplicate postings across sources
         """)
     
     # Optional: Upload custom jobs
-    with st.expander("📁 Use Custom Jobs (Optional)"):
+    with st.expander(" Use Custom Jobs (Optional)"):
         jobs_upload = st.file_uploader(
             "Upload jobs.json",
             type=["json"],
@@ -962,15 +962,15 @@ else:
             try:
                 jobs_data = json.loads(jobs_upload.getvalue())
                 save_json(JOBS_FILE, jobs_data)
-                st.success(f"✅ Loaded {len(jobs_data)} jobs from file")
+                st.success(f" Loaded {len(jobs_data)} jobs from file")
             except Exception as e:
-                st.error(f"❌ Invalid JSON file: {e}")
+                st.error(f" Invalid JSON file: {e}")
     
     # Run matching
     if st.session_state.get("_matching_done"):
-        st.success("✅ Matching complete! Scroll down to see your matches.")
+        st.success(" Matching complete! Scroll down to see your matches.")
         
-        # Check if results are thin and user has a city — offer to expand
+        # Check if results are thin and user has a city  offer to expand
         matches_data_check = load_json(MATCHES_FILE)
         match_count = len(matches_data_check) if isinstance(matches_data_check, list) else 0
         user_state = profile.get("state", "Any") if profile else "Any"
@@ -978,7 +978,7 @@ else:
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
+            if st.button(" Re-run Matching (Fresh Jobs)", use_container_width=True):
                 st.session_state.pop("_matching_done", None)
                 for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
                     if os.path.exists(fp):
@@ -990,7 +990,7 @@ else:
         
         with col2:
             if match_count < 5 and user_state != "Any" and user_country:
-                if st.button(f"🌍 Expand to all of {user_country}", type="primary", use_container_width=True):
+                if st.button(f" Expand to all of {user_country}", type="primary", use_container_width=True):
                     # Widen search: set state to "Any" and re-run
                     profile_data = load_json(PROFILE_FILE)
                     if profile_data:
@@ -1003,19 +1003,19 @@ else:
                     st.rerun()
     
     elif st.session_state.get("_matching_running"):
-        st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
+        st.warning("Matching in progress... This may take 30-60 seconds.")
     
     else:
         country = profile.get("country", "India")
         st.markdown(f"""
         **Ready to find your next role?**
         
-        We'll scan **6 sources** — WeWorkRemotely, RemoteOK, Remotive, Lever, 
-        and **Google Jobs** (LinkedIn, Indeed, Naukri) focused on **{country}** — 
+        We will scan **6 sources** - WeWorkRemotely, RemoteOK, Remotive, Lever, 
+        and **Google Jobs** (LinkedIn, Indeed, Naukri) focused on **{country}** - 
         then rank the best matches using AI.
         """)
         
-        if st.button("🚀 Start Job Matching", type="primary", use_container_width=True):
+        if st.button(" Start Job Matching", type="primary", use_container_width=True):
             st.session_state["_matching_running"] = True
             
             # Progress UI
@@ -1063,7 +1063,7 @@ else:
             progress_callback._max_pct = 0
             
             try:
-                status_text.info("🔍 Scanning 6 job sources and running AI matching...")
+                status_text.info(" Scanning 6 job sources and running AI matching...")
                 
                 result = run_auto_apply_pipeline(
                     profile_file=PROFILE_FILE,
@@ -1080,11 +1080,11 @@ else:
                 st.session_state.pop("_matching_running", None)
                 
                 if result and result.get("status") == "success":
-                    status_text.success(f"✅ Found {result['matches']} matches from {result['total_scored']} jobs!")
+                    status_text.success(f" Found {result['matches']} matches from {result['total_scored']} jobs!")
                 elif result and result.get("status") == "no_matches":
-                    status_text.warning("⚠️ No strong matches found. Try broadening your skills or check back later.")
+                    status_text.warning(" No strong matches found. Try broadening your skills or check back later.")
                 else:
-                    status_text.error(f"❌ Pipeline error: {result}")
+                    status_text.error(f" Pipeline error: {result}")
                 
                 time.sleep(1)
                 st.rerun()
@@ -1092,7 +1092,7 @@ else:
             except Exception as e:
                 st.session_state.pop("_matching_running", None)
                 progress_bar.progress(1.0, text="Error")
-                status_text.error(f"❌ Error: {e}")
+                status_text.error(f" Error: {e}")
                 st.exception(e)
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -1150,19 +1150,19 @@ if isinstance(matches_data, list) and matches_data:
     if letter_files:
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
+            st.markdown(f"###  Your Top {len(matches_data)} Matches")
         with col2:
             zip_data = build_zip(LETTERS_DIR)
             st.download_button(
-                f"📦 Download {len(letter_files)} Letters",
+                f" Download {len(letter_files)} Letters",
                 data=zip_data,
                 file_name="jobbot_cover_letters.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
     else:
-        st.markdown(f"### 🎯 Your Top {len(matches_data)} Matches")
-        st.caption("💡 Click 'Generate Letter' on any job to create a tailored cover letter")
+        st.markdown(f"###  Your Top {len(matches_data)} Matches")
+        st.caption(" Click 'Generate Letter' on any job to create a tailored cover letter")
     
     # Job cards
     for i, job in enumerate(matches_data, 1):
@@ -1174,21 +1174,21 @@ if isinstance(matches_data, list) and matches_data:
         
         # Score badge
         if score >= 75:
-            badge_emoji = "🔥"
+            badge_emoji = ""
             badge_class = "score-excellent"
         elif score >= 60:
-            badge_emoji = "⭐"
+            badge_emoji = ""
             badge_class = "score-good"
         else:
-            badge_emoji = "👍"
+            badge_emoji = ""
             badge_class = "score-fair"
         
-        with st.expander(f"#{i} · {badge_emoji} {company} — {title} ({score}%)"):
+        with st.expander(f"#{i} · {badge_emoji} {company}  {title} ({score}%)"):
             col1, col2 = st.columns([3, 1])
             
             with col1:
                 st.markdown(f"**{title}**")
-                st.markdown(f"🏢 **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
+                st.markdown(f" **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
                 
                 # Job location and experience info
                 job_location = job.get("location", "")
@@ -1201,13 +1201,13 @@ if isinstance(matches_data, list) and matches_data:
                 
                 info_parts = []
                 if job_location:
-                    info_parts.append(f"📍 {job_location}")
+                    info_parts.append(f" {job_location}")
                 # Try to extract experience from summary
                 import re as _re
                 exp_match = _re.search(r'(\d+)\+?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)?', 
                                        job.get("summary", "").lower())
                 if exp_match:
-                    info_parts.append(f"📅 {exp_match.group(0).strip()}")
+                    info_parts.append(f" {exp_match.group(0).strip()}")
                 
                 if info_parts:
                     st.caption(" · ".join(info_parts))
@@ -1223,12 +1223,12 @@ if isinstance(matches_data, list) and matches_data:
                     unsafe_allow_html=True
                 )
                 if job.get("apply_url"):
-                    st.link_button("🔗 Apply Now", job["apply_url"], use_container_width=True)
+                    st.link_button(" Apply Now", job["apply_url"], use_container_width=True)
                 
                 # Per-job cover letter button
                 letter_content, letter_fname = find_cover_letter(company, title)
                 if not letter_content:
-                    if st.button("📝 Generate Letter", key=f"gen_{i}", use_container_width=True):
+                    if st.button(" Generate Letter", key=f"gen_{i}", use_container_width=True):
                         with st.spinner("Writing cover letter..."):
                             try:
                                 os.makedirs(LETTERS_DIR, exist_ok=True)
@@ -1242,10 +1242,10 @@ if isinstance(matches_data, list) and matches_data:
             letter_content, letter_fname = find_cover_letter(company, title)
             if letter_content:
                 st.markdown("---")
-                st.markdown('<p class="cover-letter-label">📝 Tailored Cover Letter</p>', unsafe_allow_html=True)
+                st.markdown('<p class="cover-letter-label"> Tailored Cover Letter</p>', unsafe_allow_html=True)
                 st.markdown(f'<div class="cover-letter-box">{letter_content}</div>', unsafe_allow_html=True)
                 st.download_button(
-                    "📥 Download Letter",
+                    " Download Letter",
                     data=letter_content,
                     file_name=letter_fname or f"cover_letter_{i}.txt",
                     mime="text/plain",
@@ -1259,7 +1259,7 @@ if isinstance(matches_data, list) and matches_data:
 
 st.markdown("""
 <div class="footer">
-    Built with ❤️ using Streamlit & Gemini 2.5 Flash<br>
+    Built with  using Streamlit & Gemini 2.5 Flash<br>
     <a href="https://github.com" target="_blank">View on GitHub</a> · 
     <a href="#" onclick="alert('Feature coming soon!')">Report Bug</a>
 </div>
