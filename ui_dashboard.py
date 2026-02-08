@@ -397,7 +397,7 @@ code, .stCode, pre {
     padding: 0.65rem 1.25rem !important;
     font-weight: 600 !important;
     font-size: 0.95rem !important;
-    transition: all 0.2s ease !important;
+    transition: all 0.3s ease !important;
     box-shadow: 0 2px 8px rgba(108,92,231,0.2) !important;
 }
 
@@ -405,6 +405,30 @@ code, .stCode, pre {
     background: #5b4bd5 !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 12px rgba(108,92,231,0.3) !important;
+}
+
+/* VIBRANT Apply Now Button - Stand out in job cards */
+/* Target link_button specifically */
+div[data-testid="baseButton-secondary"] a {
+    background: linear-gradient(135deg, #ff6b35 0%, #ff8555 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 12px !important;
+    padding: 0.75rem 1.5rem !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 16px rgba(255, 107, 53, 0.3) !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+
+div[data-testid="baseButton-secondary"] a:hover {
+    background: linear-gradient(135deg, #ff5920 0%, #ff7a45 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4) !important;
 }
 
 /* ============ EXPANDERS (job cards) ============ */
@@ -438,26 +462,76 @@ div[data-testid="stExpander"] > div:last-child {
     backdrop-filter: blur(10px) !important;
 }
 
+/* Input elements within expanders */
+div[data-testid="stExpander"] .stTextInput > div > div > input,
+div[data-testid="stExpander"] .stTextArea > div > div > textarea,
+div[data-testid="stExpander"] .stSelectbox > div > div {
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: #1a1a2e !important;
+}
+
+/* Focus state within expanders */
+div[data-testid="stExpander"] .stTextInput > div > div > input:focus,
+div[data-testid="stExpander"] .stTextArea > div > div > textarea:focus,
+div[data-testid="stExpander"] .stSelectbox > div > div:focus {
+    background: rgba(255, 255, 255, 0.99) !important;
+    color: #1a1a2e !important;
+}
+
 /* ============ INPUTS ============ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div {
-    background: rgba(255, 255, 255, 0.7) !important;
+    background: rgba(255, 255, 255, 0.85) !important;
     backdrop-filter: blur(10px) !important;
-    border: 1.5px solid rgba(224, 224, 234, 0.6) !important;
+    border: 1.5px solid rgba(224, 224, 234, 0.8) !important;
     border-radius: 12px !important;
     color: #1a1a2e !important;
     font-size: 0.95rem !important;
     padding: 0.75rem 1rem !important;
     transition: all 0.3s ease !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
 }
 
+/* Focus state - subtle, clean appearance */
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus,
-.stSelectbox > div > div:focus {
-    border-color: #d0cfe8 !important;
-    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1) !important;
+.stSelectbox > div > div:focus,
+.stMultiSelect > div > div:focus {
+    border-color: #6c5ce7 !important;
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12), 0 2px 12px rgba(108, 92, 231, 0.1) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    color: #1a1a2e !important;
+    outline: none !important;
+}
+
+/* Prevent black text appearance on selection */
+.stTextInput > div > div > input::selection,
+.stTextArea > div > div > textarea::selection {
+    background: rgba(108, 92, 231, 0.2) !important;
+    color: #1a1a2e !important;
+}
+
+/* Selectbox dropdown styling */
+.stSelectbox > div > div > div,
+.stMultiSelect > div > div > div {
     background: rgba(255, 255, 255, 0.95) !important;
+    color: #1a1a2e !important;
+}
+
+/* Selectbox custom select element styling */
+select, 
+div[data-baseweb="select"] {
+    background: rgba(255, 255, 255, 0.85) !important;
+    color: #1a1a2e !important;
+    border-color: rgba(224, 224, 234, 0.8) !important;
+}
+
+select:focus, 
+div[data-baseweb="select"]:focus {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-color: #6c5ce7 !important;
+    color: #1a1a2e !important;
 }
 
 .stTextInput > div > div > input::placeholder,
@@ -468,7 +542,8 @@ div[data-testid="stExpander"] > div:last-child {
 /* Enhance label styling */
 .stTextInput > label,
 .stTextArea > label,
-.stSelectbox > label {
+.stSelectbox > label,
+.stMultiSelect > label {
     font-weight: 600 !important;
     color: #3d3d56 !important;
     margin-bottom: 0.5rem !important;
@@ -621,6 +696,28 @@ div[data-testid="stMarkdownContainer"],
 div[data-testid="stMarkdownContainer"] *,
 .stCaption, .element-container * {
     font-family: 'DM Sans', sans-serif !important;
+}
+
+/* Input wrapper elements - prevent dark backgrounds */
+.stTextInput > div,
+.stTextArea > div,
+.stSelectbox > div,
+.stMultiSelect > div {
+    background: transparent !important;
+}
+
+/* Input inner wrappers */
+.stTextInput > div > div,
+.stTextArea > div > div,
+.stSelectbox > div > div {
+    background: transparent !important;
+}
+
+/* Override Streamlit's input wrapper defaults */
+div[data-testid="stTextInput"],
+div[data-testid="stTextArea"],
+div[data-testid="stSelectbox"] {
+    background: transparent !important;
 }
 
 /* Captions - consistent styling */

@@ -349,9 +349,8 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
     """
     Fetch jobs from Serper.dev Google Jobs API.
     PRIMARY provider — 2,500 free searches/month.
-    Falls back to SerpAPI if Serper is unavailable.
     
-    FIXED: Now uses /jobs endpoint instead of /search for proper job data structure.
+    FIXED: Uses /search endpoint with proper job query structure.
     """
     if not SERPER_API_KEY:
         logger.info("Serper.dev: No API key set (SERPER_API_KEY), skipping")
@@ -376,27 +375,19 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
                 "Content-Type": "application/json"
             }
             
-            # Build payload for /jobs endpoint
+            # Build payload for /search endpoint with job context
             payload = {
-                "q": search_query,
-                "gl": "us",  # Country code
-                "hl": "en",  # Language
-                "num": 10,   # Number of results
+                "q": f"{search_query} jobs",  # Specify job search context
+                "type": "jobs",  # Tell Serper we want jobs
+                "num": 10,
+                "autocorrect": True
             }
-            
-            # Use location if provided
-            loc = query_config.get("location")
-            if loc and loc.lower() not in ("remote", "remote only", ""):
-                payload["gl"] = "in" if "india" in loc.lower() else "us"
-                # For jobs endpoint, location can be city name
-                if "india" in loc.lower() or "bangalore" in loc.lower() or "bengaluru" in loc.lower():
-                    payload["location"] = loc
 
             logger.info(f"Serper.dev: Searching '{search_query}'")
             
-            # CRITICAL FIX: Use /jobs endpoint, not /search
+            # Use /search endpoint with type=jobs parameter
             response = requests.post(
-                "https://google.serper.dev/jobs",  # Changed from /search to /jobs
+                "https://google.serper.dev/search",
                 json=payload, headers=headers, timeout=timeout
             )
             searches_used += 1
@@ -414,20 +405,18 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
             data = response.json()
             added = 0
 
-            # CRITICAL FIX: Parse 'jobs' array instead of 'organic'
+            # Parse job results from /search endpoint
             for job_result in data.get("jobs", []):
                 try:
-                    # Serper.dev /jobs endpoint returns structured job data
                     title = job_result.get("title", "").strip()
-                    company = job_result.get("companyName", "").strip() or "Unknown"
+                    company = job_result.get("company", "").strip() or "Unknown"
                     description = job_result.get("description", "").strip()
                     location = job_result.get("location", "").strip()
                     
-                    # Get apply link - Serper provides the actual job application URL
-                    apply_link = job_result.get("applyLink", "").strip()
+                    # Get apply link - Serper provides link field
+                    apply_link = job_result.get("link", "").strip()
                     if not apply_link:
-                        # Fallback to job link if apply link not available
-                        apply_link = job_result.get("link", "").strip()
+                        apply_link = job_result.get("url", "").strip()
                     
                     if not title or not apply_link:
                         continue
@@ -488,7 +477,7 @@ def fetch_serper_jobs(queries: list = None, timeout: int = NETWORK_TIMEOUT) -> l
                     logger.debug(f"Serper.dev: Error parsing job result: {e}")
                     continue
 
-            logger.info(f"Serper.dev: '{search_query}' -> {added} new jobs")
+            logger.info(f"Serper.dev: '{search_query}' → {added} new jobs ({added} results)")
 
             # Rate limiting delay
             if searches_used < len(queries):
