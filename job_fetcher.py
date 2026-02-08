@@ -36,12 +36,16 @@ RETRY_DELAY = 2  # seconds
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
 # SerperDev is for general web search (not optimized for structured job data)
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
+# SerpAPI (google jobs scrapper) key
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
 
-if not JSEARCH_API_KEY or not SERPER_API_KEY:
+# If running under Streamlit, also try reading secrets
+if not JSEARCH_API_KEY or not SERPER_API_KEY or not SERPAPI_API_KEY:
     try:
         import streamlit as _st
         JSEARCH_API_KEY = JSEARCH_API_KEY or _st.secrets.get("JSEARCH_API_KEY", "")
         SERPER_API_KEY = SERPER_API_KEY or _st.secrets.get("SERPER_API_KEY", "")
+        SERPAPI_API_KEY = SERPAPI_API_KEY or _st.secrets.get("SERPAPI_API_KEY", "")
     except (ImportError, KeyError, AttributeError):
         pass
 
@@ -670,17 +674,56 @@ def fetch_all(output_path: str = None, serper_queries: list = None,
     for src, count in sorted(source_counts.items(), key=lambda x: -x[1]):
         logger.info(f"  {src}: {count}")
 
-    # Deduplicate jobs based on URL
-    seen_urls = set()
-    unique_jobs = []
-    for job in all_jobs:
-        url = job.get("apply_url", "")
-        if url and url not in seen_urls:
-            seen_urls.add(url)
-            unique_jobs.append(job)
-        elif not url:
-            unique_jobs.append(job)
+    # Deduplicate jobs (improved): exact URL dedupe + fuzzy title/URL similarity
+    def deduplicate_jobs(jobs_list: list) -> list:
+        from urllib.parse import urlparse
+        from difflib import SequenceMatcher
+        import re
 
+        def norm_text(s: str) -> str:
+            if not s:
+                return ""
+            s = s.lower()
+            s = re.sub(r'[^a-z0-9\s]', ' ', s)
+            s = re.sub(r'\s+', ' ', s).strip()
+            return s
+
+        seen_urls = set()
+        seen_titles = []  # keep normalized titles to compare
+        out = []
+
+        for j in jobs_list:
+            url = (j.get('apply_url') or '').strip()
+            title = (j.get('title') or '').strip()
+            norm_title = norm_text(title)
+
+            # Exact URL dedupe
+            if url:
+                if url in seen_urls:
+                    continue
+            # Fuzzy title match: if very similar to an already seen title and same company, skip
+            skip = False
+            for seen in seen_titles:
+                seen_title, seen_company = seen
+                ratio = SequenceMatcher(None, norm_title, seen_title).ratio() if norm_title and seen_title else 0
+                same_company = (j.get('company','').strip().lower() == seen_company)
+                if ratio > 0.90 and (same_company or ratio > 0.95):
+                    skip = True
+                    break
+
+            if skip:
+                continue
+
+            # If no URL, accept but still track title
+            if url:
+                seen_urls.add(url)
+
+            seen_titles.append((norm_title, j.get('company','').strip().lower()))
+            out.append(j)
+
+        return out
+
+    unique_jobs = deduplicate_jobs(all_jobs)
     logger.info(f"Unique jobs after deduplication: {len(unique_jobs)}")
 
     # Save to file
