@@ -294,7 +294,7 @@ code, .stCode, pre {
 }
 
 /* ============ SOURCE BADGES ============ */
-.source-badge {
+.source-badge, .src-badge {
     display: inline-block;
     padding: 0.25rem 0.65rem;
     border-radius: 6px;
@@ -305,6 +305,44 @@ code, .stCode, pre {
     background: #eef2ff;
     color: #6366f1;
     border: 1px solid #ddd6fe;
+}
+
+/* ============ TIMESTAMP BADGES ============ */
+.ts-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+.ts-fresh {
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+}
+.ts-recent {
+    background: #fed7aa;
+    color: #ea580c;
+    border: 1px solid #fdba74;
+}
+.ts-old {
+    background: #f3f4f6;
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+}
+
+/* ============ PIN BADGE ============ */
+.pin-badge {
+    display: inline-flex;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #fecaca;
+    color: #ef4444;
+    border: 1px solid #fca5a5;
 }
 
 /* ============ BUTTONS ============ */
@@ -416,6 +454,7 @@ a:hover { color: #5b4bd5; }
 /* Code blocks in progress */
 .stCodeBlock, pre { background: #f8f8fc !important; color: #3d3d56 !important; }
 </style>
+""", unsafe_allow_html=True)
 
 # ============================================
 # IMPORTS
