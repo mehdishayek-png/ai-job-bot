@@ -54,8 +54,8 @@ st.markdown(
 header[data-testid="stHeader"] { background: transparent; }
 section[data-testid="stSidebar"]{ display:none; }
 
-/* Page padding / proportions */
-div.block-container { padding-top: 0.6rem; padding-left: 1.1rem; padding-right: 1.1rem; max-width: 1400px; }
+/* Page padding / proportions (full-width like the SVG) */
+div.block-container { padding-top: 0.3rem; padding-left: 0.35rem; padding-right: 0.35rem; max-width: none; }
 
 h1, h2, h3, h4, h5, h6,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
@@ -68,7 +68,7 @@ h1, h2, h3, h4, h5, h6,
 .stCaption, .stMarkdown p { color: var(--muted) !important; }
 
 /* Header */
-.app-header{ display:flex; align-items:center; justify-content:space-between; margin: 0.35rem 0 1.0rem; }
+.app-header{ display:flex; align-items:center; justify-content:space-between; margin: 0.15rem 0 0.85rem; }
 .header-left{ display:flex; align-items:center; gap:0.75rem; }
 .app-title{ font-size: 1.35rem; font-weight: 800; color:#fff; }
 .profile-circle{ width:44px; height:44px; border-radius:999px; background: rgba(255,255,255,0.06); border:1px solid var(--stroke); display:flex; align-items:center; justify-content:center; }
@@ -77,13 +77,31 @@ h1, h2, h3, h4, h5, h6,
 .panel{ background: rgba(255,255,255,0.03); border:1px solid var(--stroke); border-radius: 16px; overflow:hidden; }
 .panel-inner{ padding: 1.15rem; }
 
+/* Bezel wrappers (grey boxes in the SVG) */
+.bezel{ border:1px solid var(--stroke); border-radius: 16px; background: rgba(255,255,255,0.02); overflow:hidden; }
+.bezel.pad{ padding: 0.75rem; }
+
 /* Tab bars */
-.tabs{ display:flex; width:100%; border-bottom:1px solid var(--stroke); }
+.tabs-wrap{ border:1px solid var(--stroke); border-radius: 14px; overflow:hidden; background: rgba(255,255,255,0.03); }
+.tabs{ display:flex; width:100%; }
 .tab{ flex:1; text-align:center; padding: 0.95rem 0; font-weight: 800; color:#fff; background: rgba(255,255,255,0.06); }
 .tab.active{ background: linear-gradient(90deg, var(--btn-a), var(--btn-b)); }
 
 /* Section divider */
-.section-tabs{ display:flex; width:100%; border-top:1px solid var(--stroke); border-bottom:1px solid var(--stroke); margin-top: 1.1rem; }
+.section-tabs{ display:flex; width:100%; margin-top: 1.1rem; }
+
+/* Top-right source icons (LinkedIn / Google / etc) */
+.source-icons{ display:flex; gap: 0.55rem; justify-content:flex-end; align-items:center; margin-top: 0.1rem; }
+.src-ic{ width:26px; height:26px; border-radius:999px; border:1px solid var(--stroke); background: rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; font-weight:800; font-size: 0.85rem; color:#fff; }
+
+/* Status line (Poppins regular) */
+.status-line{ font-family:'Poppins',sans-serif; font-weight:400; color: rgba(255,255,255,0.75); margin: 0.25rem 0 0.35rem; }
+
+/* Expander to look like a boxed slot */
+div[data-testid="stExpander"] details{ border:1px solid var(--stroke) !important; border-radius:16px !important; background: var(--slot) !important; }
+div[data-testid="stExpander"] details:hover{ background: var(--slot-2) !important; }
+div[data-testid="stExpander"] summary{ padding: 0.95rem 1.05rem !important; }
+div[data-testid="stExpander"] summary p{ margin:0 !important; }
 
 /* Inputs */
 label { color:#fff !important; font-weight: 800 !important; }
@@ -132,6 +150,10 @@ div[data-testid="stFileUploader"] section{
 .progress-label{ color: var(--muted-2); font-weight: 800; margin-bottom: 0.35rem; }
 .progress-track{ height: 12px; border-radius: 999px; overflow:hidden; background: rgba(255,255,255,0.12); border:1px solid var(--stroke-2); }
 .progress-fill{ height:100%; background: linear-gradient(90deg, var(--btn-a), var(--btn-b)); }
+
+/* Running status (regular Poppins, minimal text) */
+.status-text{ margin-top: 0.25rem; margin-bottom: 0.45rem; color: rgba(255,255,255,0.72); font-weight: 400; }
+.mini-spinner{ display:flex; justify-content:flex-start; margin-top: 0.35rem; }
 
 /* Job slots/cards */
 .slot{ border: 1px solid var(--stroke); border-radius: 16px; background: var(--slot); height: 88px; margin-bottom: 1.2rem; }
@@ -343,7 +365,8 @@ matches_data = load_json(MATCHES_FILE)
 # MAINFRAME — LEFT/RIGHT PANELS
 # ============================================
 
-left_col, right_col = st.columns([0.34, 0.66], gap="large")
+# Slightly wider right column (matches the SVG proportions)
+left_col, right_col = st.columns([0.30, 0.70], gap="large")
 
 # ----------------------------
 # LEFT PANEL
@@ -354,9 +377,11 @@ with left_col:
     # Tabs (Tailor CV is placeholder as requested)
     st.markdown(
         """
-<div class="tabs">
-  <div class="tab active">My Profile</div>
-  <div class="tab">Tailor CV</div>
+<div class="tabs-wrap">
+  <div class="tabs">
+    <div class="tab active">My Profile</div>
+    <div class="tab">Tailor CV</div>
+  </div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -364,12 +389,66 @@ with left_col:
 
     st.markdown('<div class="panel-inner">', unsafe_allow_html=True)
 
+    # --- Upload Resume (top-most, like the SVG) ---
+    st.markdown(
+        """
+<div class="upload-tile">
+  <div class="upload-icon">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-6Z" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+      <path d="M14 2v6h6" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+      <path d="M8 13h8M8 17h8" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="upload-tile-title">Upload Resume</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    # Allow reset of uploader without hard refresh
+    if "uploader_nonce" not in st.session_state:
+        st.session_state["uploader_nonce"] = 0
+
+    uploader_key = f"resume_upload_svg_{st.session_state['uploader_nonce']}"
+    uploaded_resume = st.file_uploader(
+        " ",
+        type=["pdf"],
+        label_visibility="collapsed",
+        key=uploader_key,
+    )
+
+    cols_up = st.columns([0.65, 0.35])
+    with cols_up[0]:
+        parse_clicked = st.button("Parse File", type="primary", use_container_width=True)
+    with cols_up[1]:
+        if st.button("Upload Another", use_container_width=True):
+            st.session_state["uploader_nonce"] += 1
+            st.rerun()
+
+    st.markdown("<div style='height:0.55rem'></div>", unsafe_allow_html=True)
+
     st.markdown("### My Profile")
+
+    # Grey bezel around the form section (like the SVG)
+    st.markdown('<div class="bezel pad">', unsafe_allow_html=True)
+
+    name_in = st.text_input(
+        "Name",
+        value=profile.get("name") or "",
+        placeholder="Your name",
+    )
+
+    email_in = st.text_input(
+        "Email",
+        value=profile.get("email") or "",
+        placeholder="you@example.com",
+    )
 
     headline_in = st.text_input(
         "My Profile",
-        value=profile.get("headline") or profile.get("name") or "",
-        placeholder="My Profile",
+        value=profile.get("headline") or "",
+        placeholder="e.g., Construction Manager / Data Analyst",
     )
 
     exp_in = st.text_input(
@@ -387,12 +466,16 @@ with left_col:
         height=120,
     )
 
+    st.markdown('</div>', unsafe_allow_html=True)  # end bezel pad
+
     # Section tabs
     st.markdown(
         """
-<div class="section-tabs">
-  <div class="tab active">Job Preferences</div>
-  <div class="tab">Job Preferences</div>
+<div class="tabs-wrap" style="margin-top:1.1rem;">
+  <div class="tabs">
+    <div class="tab active">Job Preferences</div>
+    <div class="tab">Job Preferences</div>
+  </div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -426,36 +509,14 @@ with left_col:
         key="region_select",
     )
 
-    # Upload tile
-    st.markdown(
-        """
-<div class="upload-tile">
-  <div class="upload-icon">
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-      <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-6Z" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      <path d="M14 2v6h6" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      <path d="M8 13h8M8 17h8" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-  </div>
-  <div class="upload-tile-title">Upload Resume</div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-    uploaded_resume = st.file_uploader(
-        " ",
-        type=["pdf"],
-        label_visibility="collapsed",
-        key="resume_upload_svg",
-    )
-
-    parse_clicked = st.button("Parse File", type="primary", use_container_width=True)
+    # (Upload section moved to the top, per design)
 
     # Auto-save profile edits (no explicit Save button in SVG)
     def persist_profile():
         existing = load_json(PROFILE_FILE) or {}
         updated = dict(existing)
+        updated["name"] = (name_in or "").strip()
+        updated["email"] = (email_in or "").strip()
         updated["headline"] = (headline_in or "").strip()
         updated["experience"] = (exp_in or "").strip()
         updated["country"] = country_in
@@ -487,6 +548,9 @@ with left_col:
                     parsed = build_profile(resume_path, PROFILE_FILE) or {}
 
                     # Preserve UI selections
+                    parsed["name"] = (name_in or parsed.get("name") or "").strip()
+                    parsed["email"] = (email_in or parsed.get("email") or "").strip()
+                    parsed["headline"] = (headline_in or parsed.get("headline") or "").strip()
                     parsed["country"] = country_in
                     parsed["state"] = region_in
                     parsed["experience"] = (exp_in or parsed.get("experience") or "").strip()
@@ -520,6 +584,17 @@ with right_col:
         st.markdown("## Compiled Jobs According To Profile")
     with btn_col:
         start_search = st.button("Search", type="primary", use_container_width=True)
+        st.markdown(
+            """
+<div class="source-icons">
+  <div class="src-ic" title="LinkedIn">in</div>
+  <div class="src-ic" title="Google">G</div>
+  <div class="src-ic" title="Indeed">I</div>
+  <div class="src-ic" title="Remote">R</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
     # Refresh profile/matches
     profile = load_json(PROFILE_FILE) or {}
@@ -544,6 +619,15 @@ with right_col:
         unsafe_allow_html=True,
     )
 
+    # Sorting (highest match / latest posted)
+    sort_by = st.selectbox(
+        "Sort by",
+        ["Highest match %", "Latest job posted"],
+        index=0,
+        label_visibility="collapsed",
+        key="sort_by_select",
+    )
+
     # Start pipeline
     if start_search:
         if not profile_ready:
@@ -553,10 +637,11 @@ with right_col:
 
     if st.session_state.get("_matching_running"):
         status_text = st.empty()
-        detail_box = st.empty()
+        spinner_spot = st.empty()
 
-        status_text.info("🔍 Searching across sources and ranking matches…")
-        progress_bar = st.progress(0, text="Starting…")
+        # Minimal line above the bar (as requested)
+        status_text.markdown("<div class='status-text'>Fetching jobs</div>", unsafe_allow_html=True)
+        progress_bar = st.progress(0)
 
         stage_pct = {
             "Starting pipeline": 0,
@@ -579,12 +664,7 @@ with right_col:
             "Done": 100,
         }
 
-        log_lines = []
-
         def progress_callback(msg: str):
-            log_lines.append(msg)
-            detail_box.code("\n".join(log_lines[-6:]), language=None)
-
             pct_local = 0
             for keyword, p in stage_pct.items():
                 if keyword.lower() in msg.lower():
@@ -592,7 +672,15 @@ with right_col:
             current = getattr(progress_callback, "_max_pct", 0)
             pct_local = max(pct_local, current)
             progress_callback._max_pct = pct_local
-            progress_bar.progress(min(pct_local, 100) / 100.0, text=msg[:80])
+            # Keep UI calm: only advance the bar, don't spam detailed lines
+            progress_bar.progress(min(pct_local, 100) / 100.0)
+
+        # Add a small spinner image below the bar so users know the app is still working
+        try:
+            spinner_spot.markdown("<div class='mini-spinner'></div>", unsafe_allow_html=True)
+            spinner_spot.image(os.path.join(os.path.dirname(__file__), "assets", "loading_spinner.png"), width=120)
+        except Exception:
+            pass
 
         progress_callback._max_pct = 0
 
@@ -635,26 +723,85 @@ with right_col:
     matches_data = load_json(MATCHES_FILE)
 
     if isinstance(matches_data, list) and matches_data:
-        for j in matches_data[:30]:
-            title = j.get("title") or j.get("job_title") or "Job"
-            company = j.get("company") or j.get("employer") or ""
-            loc = j.get("location") or ""
-            score = j.get("match_score", j.get("score", ""))
-            url = j.get("url") or j.get("apply_url") or ""
+        def _score_val(x) -> float:
+            try:
+                if x is None:
+                    return -1.0
+                if isinstance(x, (int, float)):
+                    return float(x)
+                s = str(x).strip().replace("%", "")
+                return float(s)
+            except Exception:
+                return -1.0
 
-            left_meta, right_meta = st.columns([0.78, 0.22])
-            with left_meta:
-                st.markdown(f"<div class='job-card'><div class='job-title'>{title}</div>", unsafe_allow_html=True)
-                meta_line = " · ".join([x for x in [company, loc] if x])
-                if meta_line:
-                    st.markdown(f"<div class='job-meta'>{meta_line}</div></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("</div>", unsafe_allow_html=True)
-            with right_meta:
-                if score != "":
-                    st.markdown(f"<div class='score-pill'>{score}%</div>", unsafe_allow_html=True)
+        def _date_val(j) -> float:
+            # best-effort for "latest posted"
+            for k in ["date_posted", "posted_at", "posted", "created_at", "date", "timestamp"]:
+                v = j.get(k)
+                if not v:
+                    continue
+                try:
+                    # epoch seconds or ms
+                    if isinstance(v, (int, float)):
+                        return float(v)
+                    # ISO-like strings
+                    import datetime as _dt
+                    s = str(v).strip()
+                    # handle trailing Z
+                    s = s.replace("Z", "+00:00")
+                    dt = _dt.datetime.fromisoformat(s)
+                    return dt.timestamp()
+                except Exception:
+                    continue
+            return 0.0
+
+        if sort_by == "Highest match %":
+            matches_data = sorted(matches_data, key=lambda j: _score_val(j.get("match_score", j.get("score", ""))), reverse=True)
+        else:
+            matches_data = sorted(matches_data, key=_date_val, reverse=True)
+
+        for idx, j in enumerate(matches_data[:30]):
+            title = j.get("title") or j.get("job_title") or "Job"
+            company = (
+                j.get("company")
+                or j.get("company_name")
+                or j.get("employer")
+                or j.get("organization")
+                or j.get("org")
+                or ""
+            )
+            loc = j.get("location") or j.get("job_location") or ""
+            score = j.get("match_score", j.get("score", ""))
+            score_n = _score_val(score)
+            url = j.get("url") or j.get("apply_url") or j.get("application_url") or ""
+            desc = j.get("description") or j.get("job_description") or j.get("summary") or ""
+
+            row_left, row_right = st.columns([0.82, 0.18], gap="small")
+            with row_left:
+                # Score pill embedded with the job row (percent inside the job tab)
+                score_html = "" if score_n < 0 else f"<span class='score-pill' style='margin-left:0.6rem'>{int(round(score_n))}%</span>"
+                st.markdown(
+                    f"""
+<div class='job-card'>
+  <div class='job-title'>{title}{score_html}</div>
+  <div class='job-meta'>{' · '.join([x for x in [company, loc] if x])}</div>
+</div>
+""",
+                    unsafe_allow_html=True,
+                )
+
+                # Description on click (expander under the same job slot)
+                with st.expander("View description", expanded=False):
+                    if desc:
+                        st.markdown(desc)
+                    else:
+                        st.caption("No description available for this listing.")
+
+            with row_right:
                 if url:
                     st.link_button("Apply", url, use_container_width=True)
+                else:
+                    st.button("Apply", disabled=True, use_container_width=True, key=f"apply_disabled_{idx}")
 
         with st.expander("Actions"):
             if st.button("Clear Results", use_container_width=True):
