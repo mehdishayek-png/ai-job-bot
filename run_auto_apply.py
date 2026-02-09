@@ -92,8 +92,10 @@ def title_seniority(title):
 
 def estimate_years(profile):
     """Get years of experience — prefer user-selected value, fallback to headline parsing."""
-    # User-selected experience (from dropdown)
+    # User-selected experience (from dropdown or text input)
     exp_str = (profile.get("experience", "") or "").strip()
+    
+    # Predefined ranges (from dropdown)
     EXP_MAP = {
         "0–1 years": 0, "0-1 years": 0,
         "1–3 years": 2, "1-3 years": 2,
@@ -103,7 +105,29 @@ def estimate_years(profile):
     }
     if exp_str in EXP_MAP:
         return EXP_MAP[exp_str]
-
+    
+    # Parse flexible user input formats (e.g., "4-5", "3 to 6", "5+", "7 years")
+    if exp_str:
+        # Try to extract numbers from user input
+        # Patterns: "4-5", "3 to 6", "5+", "7 years", "7", etc.
+        
+        # Handle "X+" format (e.g., "5+", "10+ years")
+        plus_match = re.search(r'(\d+)\s*\+', exp_str)
+        if plus_match:
+            return int(plus_match.group(1)) + 2  # Add 2 to represent "at least X"
+        
+        # Handle range formats: "4-5", "3 to 6", "3–6"
+        range_match = re.search(r'(\d+)\s*[-–to]+\s*(\d+)', exp_str)
+        if range_match:
+            lower = int(range_match.group(1))
+            upper = int(range_match.group(2))
+            return (lower + upper) // 2  # Take average of range
+        
+        # Handle single number: "5", "7 years", "3 yrs"
+        single_match = re.search(r'(\d+)', exp_str)
+        if single_match:
+            return int(single_match.group(1))
+    
     # Fallback: parse from headline
     headline = (profile.get("headline", "") or "").lower()
     m = re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
