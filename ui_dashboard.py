@@ -7,6 +7,7 @@ import time
 import io
 import zipfile
 from dotenv import load_dotenv
+import base64
 
 # ============================================
 # PAGE CONFIG — MUST BE FIRST
@@ -32,8 +33,9 @@ st.markdown(
   --bg: #0e1525;
   --panel: #121a2b;
   --panel-2: #0f1727;
-  --stroke: rgba(255,255,255,0.14);
-  --stroke-2: rgba(255,255,255,0.10);
+  /* SVG bezel stroke is more visible than Streamlit defaults */
+  --stroke: rgba(255,255,255,0.18);
+  --stroke-2: rgba(255,255,255,0.12);
   --muted: rgba(255,255,255,0.55);
   --muted-2: rgba(255,255,255,0.42);
   --btn-a: #1a86e8;
@@ -55,7 +57,7 @@ header[data-testid="stHeader"] { background: transparent; }
 section[data-testid="stSidebar"]{ display:none; }
 
 /* Page padding / proportions (full-width like the SVG) */
-div.block-container { padding-top: 0.3rem; padding-left: 0.35rem; padding-right: 0.35rem; max-width: none; }
+div.block-container { padding-top: 0.25rem; padding-left: 0.05rem; padding-right: 0.05rem; max-width: none; }
 
 h1, h2, h3, h4, h5, h6,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
@@ -74,12 +76,15 @@ h1, h2, h3, h4, h5, h6,
 .profile-circle{ width:44px; height:44px; border-radius:999px; background: rgba(255,255,255,0.06); border:1px solid var(--stroke); display:flex; align-items:center; justify-content:center; }
 
 /* Panels */
-.panel{ background: rgba(255,255,255,0.03); border:1px solid var(--stroke); border-radius: 16px; overflow:hidden; }
+.panel{ background: rgba(255,255,255,0.03); border:1.5px solid var(--stroke); border-radius: 16px; overflow:hidden; box-shadow: 0 14px 34px rgba(0,0,0,0.35); }
 .panel-inner{ padding: 1.15rem; }
 
 /* Bezel wrappers (grey boxes in the SVG) */
-.bezel{ border:1px solid var(--stroke); border-radius: 16px; background: rgba(255,255,255,0.02); overflow:hidden; }
+.bezel{ border:1.5px solid var(--stroke); border-radius: 16px; background: rgba(255,255,255,0.02); overflow:hidden; }
 .bezel.pad{ padding: 0.75rem; }
+
+/* Stronger bezel for the big grey boxes */
+.bezel.big{ border-radius: 18px; border:1.75px solid rgba(255,255,255,0.20); background: rgba(255,255,255,0.015); }
 
 /* Tab bars */
 .tabs-wrap{ border:1px solid var(--stroke); border-radius: 14px; overflow:hidden; background: rgba(255,255,255,0.03); }
@@ -122,7 +127,7 @@ label { color:#fff !important; font-weight: 800 !important; }
 div[data-testid="stMarkdownContainer"] + div:has(> div[data-testid="stTextInput"]) { margin-top: -0.35rem; }
 
 /* Upload tile */
-.upload-tile{ background: rgba(255,255,255,0.06); border:1px solid var(--stroke); border-radius: 16px; padding: 1.35rem 1rem; text-align:center; margin-top: 1.1rem; }
+.upload-tile{ background: rgba(255,255,255,0.06); border:1.5px solid var(--stroke); border-radius: 16px; padding: 1.35rem 1rem; text-align:center; margin-top: 0.6rem; }
 .upload-icon{ width: 66px; height: 66px; border-radius: 14px; border: 2px solid rgba(255,255,255,0.25); margin: 0 auto 0.8rem; display:flex; align-items:center; justify-content:center; }
 .upload-tile-title{ font-weight: 800; font-size: 1.0rem; }
 
@@ -162,6 +167,21 @@ div[data-testid="stFileUploader"] section{
 .job-title{ font-weight: 800; font-size: 1.0rem; margin-bottom: 0.25rem; }
 .job-meta{ color: var(--muted); font-weight: 600; font-size: 0.9rem; }
 .score-pill{ display:inline-block; padding: 0.25rem 0.6rem; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255,255,255,0.06); font-weight: 800; }
+
+/* Job detail (inside expander) */
+.jd-company{ display:flex; align-items:center; gap:0.55rem; margin-top:0.3rem; }
+.badge{ display:inline-flex; align-items:center; gap:0.35rem; padding:0.25rem 0.55rem; border-radius: 10px; border:1px solid var(--stroke); background: rgba(111,87,234,0.12); color:#cfc7ff; font-weight:700; font-size:0.75rem; }
+.jd-meta-row{ margin-top:0.65rem; color: rgba(255,255,255,0.70); font-weight:500; font-size:0.9rem; display:flex; gap:1.25rem; align-items:center; flex-wrap:wrap; }
+.jd-desc{ margin-top:0.65rem; color: rgba(255,255,255,0.78); font-weight:400; font-size:0.93rem; line-height:1.45; }
+.desc-clamp{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.more-hint{ color: rgba(255,255,255,0.60); font-weight:600; }
+
+/* Job description preview (4-line clamp) */
+.desc-clamp{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.meta-row{ display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center; margin: 0.25rem 0 0.6rem; }
+.chip{ display:inline-flex; align-items:center; gap:0.35rem; padding:0.18rem 0.55rem; border-radius:999px; border:1px solid var(--stroke); background: rgba(255,255,255,0.05); font-weight:700; font-size:0.78rem; color:#fff; }
+.chip.muted{ color: rgba(255,255,255,0.82); }
+.job-desc-wrap a{ color: rgba(122,160,255,1) !important; text-decoration: none; font-weight: 700; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 10px; }
@@ -221,6 +241,16 @@ JOBS_FILE = os.path.join(DATA_DIR, "jobs.json")
 MATCHES_FILE = os.path.join(DATA_DIR, "matches.json")
 CACHE_FILE = os.path.join(DATA_DIR, "semantic_cache.json")
 LOG_FILE = os.path.join(DATA_DIR, "pipeline.log")
+
+
+def _asset_b64(filename: str) -> str:
+    """Return base64 string for an asset under ./assets."""
+    p = os.path.join(os.path.dirname(__file__), "assets", filename)
+    try:
+        with open(p, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    except Exception:
+        return ""
 
 # ============================================
 # HELPERS
@@ -322,25 +352,16 @@ def get_country_options():
 
 
 # ============================================
-# HEADER
+# HEADER (assets matched to SVG)
 # ============================================
 
+_logo_b64 = _asset_b64("logo.png")
+
 st.markdown(
-    """
+    f"""
 <div class="app-header">
   <div class="header-left">
-    <svg width="34" height="34" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M9 30c3-6 10-10 19-10" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
-      <path d="M12 38c1-10 9-18 20-20" stroke="url(#g)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
-      <path d="M29 8h11v11" stroke="url(#g)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M40 8L24 24" stroke="url(#g)" stroke-width="4" stroke-linecap="round"/>
-      <defs>
-        <linearGradient id="g" x1="6" y1="42" x2="44" y2="6" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#1a86e8"/>
-          <stop offset="1" stop-color="#6f57ea"/>
-        </linearGradient>
-      </defs>
-    </svg>
+    <img alt="logo" src="data:image/png;base64,{_logo_b64}" style="width:36px;height:36px;"/>
     <div class="app-title">AI Job Search</div>
   </div>
   <div class="profile-circle" title="Profile">
@@ -387,7 +408,8 @@ with left_col:
         unsafe_allow_html=True,
     )
 
-    st.markdown('<div class="panel-inner">', unsafe_allow_html=True)
+    # Big grey bezel box (matches the SVG mock)
+    st.markdown('<div class="panel-inner bezel big">', unsafe_allow_html=True)
 
     # --- Upload Resume (top-most, like the SVG) ---
     st.markdown(
@@ -509,6 +531,18 @@ with left_col:
         key="region_select",
     )
 
+    # Map asset (matches SVG placement)
+    _map_b64 = _asset_b64("map.png")
+    if _map_b64:
+        st.markdown(
+            f"""
+<div style="margin-top:0.65rem;">
+  <img alt="map" src="data:image/png;base64,{_map_b64}" style="width:100%; border-radius:12px; border:1px solid var(--stroke);"/>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
     # (Upload section moved to the top, per design)
 
     # Auto-save profile edits (no explicit Save button in SVG)
@@ -576,7 +610,8 @@ with left_col:
 # ----------------------------
 with right_col:
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.markdown('<div class="panel-inner">', unsafe_allow_html=True)
+    # Big grey bezel box (matches the SVG mock)
+    st.markdown('<div class="panel-inner bezel big">', unsafe_allow_html=True)
 
     # Title + Search button
     title_col, btn_col = st.columns([0.72, 0.28])
@@ -584,17 +619,16 @@ with right_col:
         st.markdown("## Compiled Jobs According To Profile")
     with btn_col:
         start_search = st.button("Search", type="primary", use_container_width=True)
-        st.markdown(
-            """
-<div class="source-icons">
-  <div class="src-ic" title="LinkedIn">in</div>
-  <div class="src-ic" title="Google">G</div>
-  <div class="src-ic" title="Indeed">I</div>
-  <div class="src-ic" title="Remote">R</div>
+        _src_b64 = _asset_b64("source_icons.png")
+        if _src_b64:
+            st.markdown(
+                f"""
+<div style="display:flex; justify-content:flex-end; margin-top:0.55rem;">
+  <img alt="sources" src="data:image/png;base64,{_src_b64}" style="height:26px;"/>
 </div>
 """,
-            unsafe_allow_html=True,
-        )
+                unsafe_allow_html=True,
+            )
 
     # Refresh profile/matches
     profile = load_json(PROFILE_FILE) or {}
@@ -675,12 +709,7 @@ with right_col:
             # Keep UI calm: only advance the bar, don't spam detailed lines
             progress_bar.progress(min(pct_local, 100) / 100.0)
 
-        # Add a small spinner image below the bar so users know the app is still working
-        try:
-            spinner_spot.markdown("<div class='mini-spinner'></div>", unsafe_allow_html=True)
-            spinner_spot.image(os.path.join(os.path.dirname(__file__), "assets", "loading_spinner.png"), width=120)
-        except Exception:
-            pass
+        # (Removed custom loading image as requested)
 
         progress_callback._max_pct = 0
 
@@ -792,9 +821,56 @@ with right_col:
 
                 # Description on click (expander under the same job slot)
                 with st.expander("View description", expanded=False):
-                    if desc:
-                        st.markdown(desc)
-                    else:
+                    # Rich, compact detail view (matches the reference layout)
+                    src = (j.get("source") or j.get("platform") or j.get("site") or j.get("from") or "").strip()
+                    src_badge = src.upper() if src else "SOURCE"
+
+                    exp_req = (
+                        j.get("experience")
+                        or j.get("experience_required")
+                        or j.get("years_experience")
+                        or j.get("years_of_experience")
+                        or ""
+                    )
+
+                    # Fallback: if the job doesn't carry experience, show user's years input if present
+                    if not exp_req:
+                        exp_req = (profile.get("experience") or "").strip()
+                        if exp_req:
+                            exp_req = f"{exp_req}+ years of experience"
+
+                    # Shorten description: 4 lines max
+                    safe_desc = (desc or "").strip()
+                    if safe_desc:
+                        safe_desc = re.sub(r"\s+", " ", safe_desc)
+
+                    more_tail = ""
+                    if safe_desc:
+                        more_tail = " <span class='more-hint'>… More</span>" if url else " <span class='more-hint'>…</span>"
+
+                    st.markdown(
+                        f"""
+<div class="job-desc-wrap">
+  <div class="job-title" style="margin-bottom:0.2rem;">{title}</div>
+  <div class="jd-company">
+    <div class="job-meta" style="margin:0; font-weight:700;">{company or ""}</div>
+    <span class="badge">{src_badge}</span>
+  </div>
+
+  <div class="jd-meta-row">
+    {f"<span>📍 {loc}</span>" if loc else ""}
+    {f"<span>⏳ {exp_req}</span>" if exp_req else ""}
+  </div>
+
+  <div class="jd-desc desc-clamp">{safe_desc}{more_tail}</div>
+</div>
+""",
+                        unsafe_allow_html=True,
+                    )
+
+                    if url:
+                        st.markdown(f"<a href=\"{url}\" target=\"_blank\">Open job link</a>", unsafe_allow_html=True)
+                    if not safe_desc:
                         st.caption("No description available for this listing.")
 
             with row_right:
