@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 # ============================================
 
 OUTPUT_DEFAULT = "data/jobs.json"
-NETWORK_TIMEOUT = 15  # Reduced from 30
-MAX_RETRIES = 2  # Reduced from 3
-RETRY_DELAY = 1  # Reduced from 2
+NETWORK_TIMEOUT = 20  # Reasonable timeout
+MAX_RETRIES = 2
+RETRY_DELAY = 1
 
 # ============================================
 # API KEYS - ROBUST LOADING
@@ -36,12 +36,10 @@ RETRY_DELAY = 1  # Reduced from 2
 
 def load_api_key(key_name):
     """Load API key from environment or Streamlit secrets"""
-    # Try environment first
     key = os.getenv(key_name, "")
     if key:
         return key
     
-    # Try Streamlit secrets
     try:
         import streamlit as st
         return st.secrets.get(key_name, "")
@@ -53,7 +51,6 @@ SERPER_API_KEY = load_api_key("SERPER_API_KEY")
 JSEARCH_API_KEY = load_api_key("JSEARCH_API_KEY") or load_api_key("RAPIDAPI_KEY")
 SERPAPI_API_KEY = load_api_key("SERPAPI_API_KEY") or load_api_key("SERPAPI_KEY")
 
-# Log which keys are available
 logger.info("API Keys loaded:")
 logger.info(f"  SerperDev: {'✓' if SERPER_API_KEY else '✗ MISSING'}")
 logger.info(f"  JSearch: {'✓' if JSEARCH_API_KEY else '✗ MISSING'}")
@@ -86,36 +83,41 @@ def extract_company_from_title(title: str) -> tuple:
     return ("", title)
 
 # ============================================
-# JOB SOURCES CONFIGURATION (OPTIMIZED)
+# JOB SOURCES CONFIGURATION
 # ============================================
 
-# Reduced WWR feeds to most relevant categories
+# KEEP all WWR feeds - they're quality remote jobs but fetch selectively
 WWR_FEEDS = [
     "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+    "https://weworkremotely.com/categories/remote-design-jobs.rss",
+    "https://weworkremotely.com/categories/remote-marketing-jobs.rss",
+    "https://weworkremotely.com/categories/remote-customer-support-jobs.rss",
     "https://weworkremotely.com/categories/remote-product-jobs.rss",
+    "https://weworkremotely.com/categories/remote-sales-jobs.rss",
 ]
 
 REMOTEOK = "https://remoteok.com/remote-jobs.rss"
 JOBICY = "https://jobicy.com/feed/"
 ADZUNA_INDIA = "https://www.adzuna.in/rss"
 
-# REMOVED: Lever companies - too resource intensive
-# REMOVED: Himalayas - bloats search
+# REMOVED: Lever - too slow (23 companies × 2-3 seconds each = 45-60 seconds)
+# REMOVED: Himalayas - bloats with 100+ remote jobs
 
-# API query limits (optimized for speed)
-SERPER_QUERIES = 0  # Free tier doesn't support /jobs endpoint
-JSEARCH_QUERIES = 3  # Reduced from 5
-SERPAPI_QUERIES = 3  # Reduced from 4
+# API query limits - KEEP THESE, they're fast and have LOCAL jobs
+SERPER_QUERIES = 0
+JSEARCH_QUERIES = 5  # KEEP - has local jobs
+SERPAPI_QUERIES = 4  # KEEP - Google Jobs has lots of local listings
 
 __all__ = ['fetch_all', 'build_queries_from_profile', 'SERPER_QUERIES', 'JSEARCH_QUERIES', 'SERPAPI_QUERIES']
 
 
 # ============================================
-# RSS PARSING (OPTIMIZED WITH PARALLEL)
+# RSS PARSING
 # ============================================
 
-def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries: int = MAX_RETRIES) -> list:
-    """Parse RSS feed with retries and timeout optimization"""
+def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, 
+              max_retries: int = MAX_RETRIES, max_jobs: int = None) -> list:
+    """Parse RSS feed with optional job limit"""
     jobs = []
 
     for attempt in range(max_retries):
@@ -139,7 +141,10 @@ def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries
                 logger.warning(f"{source} returned no entries")
                 return []
 
-            for entry in feed.entries:
+            # Limit entries if max_jobs specified (for remote feeds)
+            entries = feed.entries[:max_jobs] if max_jobs else feed.entries
+
+            for entry in entries:
                 try:
                     raw_title = entry.get("title", "").strip()
                     author = entry.get("author", "").strip()
@@ -249,13 +254,13 @@ def build_queries_from_profile(profile: dict) -> tuple:
     
     skills = profile.get("skills", [])[:3]
     
-    # Use primary search term
-    for term in search_terms[:2]:
+    # Generate queries
+    for term in search_terms[:3]:
         queries.append(term)
     
-    # Add one skill-enhanced query
     if skills and search_terms:
-        queries.append(f"{search_terms[0]} {skills[0]}")
+        for skill in skills[:2]:
+            queries.append(f"{search_terms[0]} {skill}")
     
     # Location
     location = None
@@ -272,12 +277,11 @@ def build_queries_from_profile(profile: dict) -> tuple:
 
 
 # ============================================
-# JSEARCH API (OPTIMIZED)
+# JSEARCH API
 # ============================================
 
-def fetch_jsearch_jobs(queries: list, location: str = None, 
-                       per_query: int = 10) -> list:
-    """Fetch from JSearch API with optimized pagination"""
+def fetch_jsearch_jobs(queries: list, location: str = None, per_query: int = 15) -> list:
+    """Fetch from JSearch API - GOOD for local jobs"""
     if not JSEARCH_API_KEY:
         logger.warning("JSearch API key missing")
         return []
@@ -294,7 +298,7 @@ def fetch_jsearch_jobs(queries: list, location: str = None,
         try:
             params = {
                 "query": f"{query} {location}" if location else query,
-                "num_pages": 1,  # Single page only for speed
+                "num_pages": 1,
                 "page": 1,
             }
             
@@ -321,7 +325,7 @@ def fetch_jsearch_jobs(queries: list, location: str = None,
                 except Exception:
                     continue
             
-            time.sleep(0.5)  # Reduced delay
+            time.sleep(0.7)
             
         except Exception as e:
             logger.warning(f"JSearch error for '{query}': {e}")
@@ -331,12 +335,11 @@ def fetch_jsearch_jobs(queries: list, location: str = None,
 
 
 # ============================================
-# SERPAPI (OPTIMIZED)
+# SERPAPI
 # ============================================
 
-def fetch_serpapi_jobs(queries: list, location: str = None, 
-                       per_query: int = 10) -> list:
-    """Fetch from SerpAPI with optimized settings"""
+def fetch_serpapi_jobs(queries: list, location: str = None, per_query: int = 15) -> list:
+    """Fetch from SerpAPI - EXCELLENT for local Google Jobs"""
     if not SERPAPI_API_KEY:
         logger.warning("SerpAPI key missing")
         return []
@@ -372,14 +375,12 @@ def fetch_serpapi_jobs(queries: list, location: str = None,
                     link = j.get("share_url") or j.get("related_links", [{}])[0].get("link", "")
                     job_location = j.get("location", "")
                     
-                    source = "SerpAPI (Google Jobs)"
-                    
                     job = {
                         "title": title,
                         "company": company,
                         "summary": strip_html(description[:500]),
                         "apply_url": link,
-                        "source": source,
+                        "source": "SerpAPI (Google Jobs)",
                         "location": job_location,
                     }
                     job["location_tags"] = extract_location_from_job(job)
@@ -390,7 +391,7 @@ def fetch_serpapi_jobs(queries: list, location: str = None,
                 except Exception:
                     continue
 
-            time.sleep(0.5)  # Reduced delay
+            time.sleep(0.7)
 
         except Exception as e:
             logger.warning(f"SerpAPI error for '{query}': {e}")
@@ -409,42 +410,44 @@ def fetch_rss_parallel(feeds: list) -> list:
     
     with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_feed = {
-            executor.submit(parse_rss, feed_url, feed_name): (feed_url, feed_name)
-            for feed_url, feed_name in feeds
+            executor.submit(parse_rss, feed_url, feed_name, NETWORK_TIMEOUT, MAX_RETRIES, max_jobs): 
+            (feed_url, feed_name)
+            for feed_url, feed_name, max_jobs in feeds
         }
         
         for future in as_completed(future_to_feed):
             try:
-                jobs = future.result(timeout=20)
+                jobs = future.result(timeout=25)
                 all_jobs.extend(jobs)
             except Exception as e:
-                feed_url, feed_name = future_to_feed[future]
+                feed_url, feed_name = future_to_feed[future][:2]
                 logger.error(f"Failed to fetch {feed_name}: {e}")
     
     return all_jobs
 
 
 # ============================================
-# MAIN ORCHESTRATOR (OPTIMIZED)
+# MAIN ORCHESTRATOR (OPTIMIZED FOR SPEED + LOCAL QUALITY)
 # ============================================
 
 def fetch_all(output_path: str = None, profile: dict = None, 
               prioritize_local: bool = False) -> list:
     """
-    Optimized job fetching - targets 1-2 minute runtime
+    Smart job fetching - fast search, prioritizes local jobs
     
-    Key optimizations:
-    - REMOVED: Lever companies (too slow)
-    - REMOVED: Himalayas (bloats results)
+    KEY CHANGES:
+    - REMOVED Lever (23 companies × 2s = 45-60s saved)
+    - REMOVED Himalayas (bloats with remote jobs)
+    - LIMIT remote RSS feeds (WWR, RemoteOK) to first 30-40 jobs each
+    - KEEP all API sources (JSearch, SerpAPI - excellent local coverage)
     - Parallel RSS fetching
-    - Reduced API queries
-    - Lower timeouts and retries
-    - Streamlined RSS feeds
+    
+    Expected time: 60-90 seconds
     """
     output_path = output_path or OUTPUT_DEFAULT
     all_jobs = []
 
-    logger.info("Starting OPTIMIZED job fetch")
+    logger.info("Starting OPTIMIZED job fetch (local-friendly)")
 
     # Generate queries from profile
     if profile:
@@ -454,58 +457,60 @@ def fetch_all(output_path: str = None, profile: dict = None,
         queries = []
         location = None
 
-    # Layer 1: API sources (parallel where possible)
+    # Layer 1: API sources (KEEP - fast and have local jobs)
     if queries:
         jsearch_queries = queries[:JSEARCH_QUERIES]
         serpapi_queries = queries[:SERPAPI_QUERIES]
 
-        logger.info(f"API split: JSearch={len(jsearch_queries)}, SerpAPI={len(serpapi_queries)}")
+        logger.info(f"API queries: JSearch={len(jsearch_queries)}, SerpAPI={len(serpapi_queries)}")
 
-        # JSearch
+        # JSearch - good local coverage
         try:
             jobs = fetch_jsearch_jobs(jsearch_queries, location)
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"JSearch failed: {e}")
 
-        # SerpAPI
+        # SerpAPI - excellent local Google Jobs
         try:
             jobs = fetch_serpapi_jobs(serpapi_queries, location)
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"SerpAPI failed: {e}")
 
-    # Layer 2: Remotive (fast API)
+    # Layer 2: Remotive (fast API, mostly remote but quality)
     try:
         jobs = fetch_remotive_jobs()
         all_jobs.extend(jobs)
     except Exception as e:
         logger.error(f"Remotive failed: {e}")
 
-    # Layer 3: RSS feeds (PARALLEL for speed)
-    logger.info("Fetching RSS feeds in parallel")
+    # Layer 3: RSS feeds (PARALLEL + SMART LIMITS)
+    logger.info("Fetching RSS feeds in parallel with limits")
     
-    # Build feed list based on prioritization
     feeds_to_fetch = []
     
+    # WWR - LIMIT to 30 jobs per feed when prioritizing local
+    # This prevents remote job flood while keeping quality matches
     if prioritize_local:
-        # Limit WWR when prioritizing local
-        for feed_url in WWR_FEEDS[:1]:  # Just programming
-            feeds_to_fetch.append((feed_url, "WeWorkRemotely"))
+        logger.info("Local priority: limiting WWR feeds to 30 jobs each")
+        for feed_url in WWR_FEEDS[:3]:  # Just top 3 categories
+            feeds_to_fetch.append((feed_url, "WeWorkRemotely", 30))
     else:
-        # All WWR feeds for remote-first
+        logger.info("Remote-friendly: fetching all WWR feeds (50 jobs each)")
         for feed_url in WWR_FEEDS:
-            feeds_to_fetch.append((feed_url, "WeWorkRemotely"))
+            feeds_to_fetch.append((feed_url, "WeWorkRemotely", 50))
     
-    # Always fetch these
-    feeds_to_fetch.extend([
-        (JOBICY, "Jobicy"),
-        (ADZUNA_INDIA, "Adzuna India"),
-    ])
+    # RemoteOK - LIMIT to 40 jobs (it often returns 100+)
+    if not prioritize_local or len(all_jobs) < 80:
+        feeds_to_fetch.append((REMOTEOK, "RemoteOK", 40))
+        logger.info("Including RemoteOK (limited to 40 jobs)")
     
-    # Conditionally fetch RemoteOK
-    if not prioritize_local or len(all_jobs) < 60:
-        feeds_to_fetch.append((REMOTEOK, "RemoteOK"))
+    # Jobicy - smaller feed, always fetch all
+    feeds_to_fetch.append((JOBICY, "Jobicy", None))
+    
+    # Adzuna India - LOCAL jobs, always fetch all
+    feeds_to_fetch.append((ADZUNA_INDIA, "Adzuna India", None))
     
     # Fetch all RSS in parallel
     rss_jobs = fetch_rss_parallel(feeds_to_fetch)
@@ -564,7 +569,6 @@ if __name__ == "__main__":
     try:
         output = sys.argv[1] if len(sys.argv) > 1 else OUTPUT_DEFAULT
 
-        # Test with sample queries
         test_profile = {
             "search_terms": ["software engineer", "data analyst"],
             "headline": "Software Engineer",
@@ -573,7 +577,7 @@ if __name__ == "__main__":
             "country": "India"
         }
 
-        jobs = fetch_all(output_path=output, profile=test_profile)
+        jobs = fetch_all(output_path=output, profile=test_profile, prioritize_local=True)
 
         print(f"\n✅ Fetched {len(jobs)} jobs!")
         print(f"Saved to: {output}")
