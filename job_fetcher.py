@@ -4,7 +4,6 @@ import json
 import os
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ============================================
 # Import location utilities
@@ -26,9 +25,9 @@ logger = logging.getLogger(__name__)
 # ============================================
 
 OUTPUT_DEFAULT = "data/jobs.json"
-NETWORK_TIMEOUT = 15  # Reduced from 30
-MAX_RETRIES = 2  # Reduced from 3
-RETRY_DELAY = 1  # Reduced from 2
+NETWORK_TIMEOUT = 30
+MAX_RETRIES = 3
+RETRY_DELAY = 2
 
 # ============================================
 # API KEYS - ROBUST LOADING
@@ -86,36 +85,49 @@ def extract_company_from_title(title: str) -> tuple:
     return ("", title)
 
 # ============================================
-# JOB SOURCES CONFIGURATION (OPTIMIZED)
+# JOB SOURCES CONFIGURATION
 # ============================================
 
-# Reduced WWR feeds to most relevant categories
 WWR_FEEDS = [
     "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+    "https://weworkremotely.com/categories/remote-design-jobs.rss",
+    "https://weworkremotely.com/categories/remote-marketing-jobs.rss",
+    "https://weworkremotely.com/categories/remote-customer-support-jobs.rss",
     "https://weworkremotely.com/categories/remote-product-jobs.rss",
+    "https://weworkremotely.com/categories/remote-sales-jobs.rss",
 ]
 
 REMOTEOK = "https://remoteok.com/remote-jobs.rss"
 JOBICY = "https://jobicy.com/feed/"
-ADZUNA_INDIA = "https://www.adzuna.in/rss"
+HIMALAYAS = "https://himalayas.app/jobs/rss"  # ~100 recent jobs, high quality, remote-friendly
+ADZUNA_INDIA = "https://www.adzuna.in/rss"  # India-focused job aggregator
 
-# REMOVED: Lever companies - too resource intensive
-# REMOVED: Himalayas - bloats search
+LEVER_COMPANIES = [
+    "razorpay", "postman", "hasura", "chargebee",
+    "browserstack", "clevertap", "druva", "freshworks",
+    "zeta-suite", "unacademy", "meesho", "cred",
+    "netflix", "figma", "notion", "stripe", "databricks",
+    "cloudflare", "twilio", "datadog", "gitlab",
+    "hubspot",
+]
+LEVER_PER_COMPANY = 20
 
-# API query limits (optimized for speed)
-SERPER_QUERIES = 0  # Free tier doesn't support /jobs endpoint
-JSEARCH_QUERIES = 3  # Reduced from 5
-SERPAPI_QUERIES = 3  # Reduced from 4
+# API query limits (rebalanced for local prioritization)
+# When prioritizing local: SerpAPI and JSearch get more queries (better local results)
+# When remote-first: balanced distribution
+SERPER_QUERIES = 0  # Free tier doesn't support /jobs endpoint - skip entirely
+JSEARCH_QUERIES = 5  # Increased - good for local jobs and has better coverage
+SERPAPI_QUERIES = 4  # Increased - best for local Google Jobs results
 
 __all__ = ['fetch_all', 'build_queries_from_profile', 'SERPER_QUERIES', 'JSEARCH_QUERIES', 'SERPAPI_QUERIES']
 
 
 # ============================================
-# RSS PARSING (OPTIMIZED WITH PARALLEL)
+# RSS PARSING
 # ============================================
 
 def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries: int = MAX_RETRIES) -> list:
-    """Parse RSS feed with retries and timeout optimization"""
+    """Parse RSS feed with retries"""
     jobs = []
 
     for attempt in range(max_retries):
@@ -173,12 +185,12 @@ def parse_rss(url: str, source: str, timeout: int = NETWORK_TIMEOUT, max_retries
 
         except requests.Timeout:
             if attempt < max_retries - 1:
-                time.sleep(RETRY_DELAY)
+                time.sleep(RETRY_DELAY * (attempt + 1))
             else:
                 logger.error(f"{source} failed after {max_retries} timeout attempts")
         except Exception as e:
             if attempt < max_retries - 1:
-                time.sleep(RETRY_DELAY)
+                time.sleep(RETRY_DELAY * (attempt + 1))
             else:
                 logger.error(f"{source} failed: {e}")
                 break
@@ -219,14 +231,12 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
                     "posted_date": j.get("publication_date", ""),
                 }
                 job["location_tags"] = extract_location_from_job(job)
-
                 if job["title"] and job["apply_url"]:
                     jobs.append(job)
-            except Exception as e:
-                logger.warning(f"Error parsing Remotive job: {e}")
+            except Exception:
                 continue
 
-        logger.info(f"Remotive: {len(jobs)} jobs fetched")
+        logger.info(f"Successfully fetched {len(jobs)} jobs from Remotive")
         return jobs
 
     except Exception as e:
@@ -235,145 +245,325 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
 
 
 # ============================================
+# LEVER API
+# ============================================
+
+def fetch_lever_jobs(companies: list = None, max_per_company: int = LEVER_PER_COMPANY) -> list:
+    """Fetch jobs from Lever public API"""
+    companies = companies or LEVER_COMPANIES
+    all_jobs = []
+    successful = 0
+
+    logger.info(f"Fetching from {len(companies)} Lever companies")
+
+    for company in companies:
+        try:
+            url = f"https://api.lever.co/v0/postings/{company}"
+            response = requests.get(url, timeout=10)
+
+            if response.status_code == 404:
+                continue
+
+            response.raise_for_status()
+            postings = response.json()
+
+            if not isinstance(postings, list):
+                continue
+
+            company_jobs = 0
+            for p in postings[:max_per_company]:
+                try:
+                    if not isinstance(p, dict):
+                        continue
+
+                    job = {
+                        "title": p.get("text", "Unknown").strip(),
+                        "company": company.replace("-", " ").title(),
+                        "summary": strip_html((p.get("description", "") or p.get("descriptionPlain", ""))[:500]),
+                        "apply_url": p.get("applyUrl") or p.get("hostedUrl", ""),
+                        "source": "Lever",
+                        "location": ", ".join(p.get("categories", {}).get("location", [])),
+                        "posted_date": p.get("createdAt", ""),
+                    }
+                    job["location_tags"] = extract_location_from_job(job)
+
+                    if job["title"] and job["apply_url"]:
+                        all_jobs.append(job)
+                        company_jobs += 1
+                except Exception:
+                    continue
+
+            if company_jobs > 0:
+                logger.info(f"Lever: {company} → {company_jobs} jobs")
+                successful += 1
+
+            time.sleep(0.3)
+
+        except Exception:
+            continue
+
+    logger.info(f"Lever total: {len(all_jobs)} jobs from {successful}/{len(companies)} companies")
+    return all_jobs
+
+
+# ============================================
 # QUERY BUILDER
 # ============================================
 
 def build_queries_from_profile(profile: dict) -> tuple:
-    """Build search queries from user profile"""
-    queries = []
-    
+    """Generate queries from profile. Returns (queries, location)"""
+    headline = (profile.get("headline", "") or "").strip()
+    skills = profile.get("skills", [])
+    country = (profile.get("country", "") or "").strip()
+    state = (profile.get("state", "") or "").strip()
     search_terms = profile.get("search_terms", [])
-    if not search_terms:
-        headline = profile.get("headline", "")
-        search_terms = [headline] if headline else ["jobs"]
-    
-    skills = profile.get("skills", [])[:3]
-    
-    # Use primary search term
-    for term in search_terms[:2]:
-        queries.append(term)
-    
-    # Add one skill-enhanced query
-    if skills and search_terms:
-        queries.append(f"{search_terms[0]} {skills[0]}")
-    
-    # Location
+    industry = (profile.get("industry", "") or "").strip()
+
+    # Determine if remote-only
+    is_remote_only = country.lower() in ("remote only", "remote", "global")
+
+    # Build location string
     location = None
-    country = profile.get("country", "")
-    state = profile.get("state", "")
-    
-    if country and country.lower() != "remote only":
-        if state and state != country:
-            location = f"{state}, {country}"
-        else:
+    if not is_remote_only:
+        if state and state != "Any":
+            location = state.replace("(", "").replace(")", "")
+        elif country:
             location = country
+
+    queries = []
+
+    # Priority 1: Search terms
+    if search_terms:
+        for term in search_terms[:5]:
+            queries.append(term)
+
+    # Priority 2: Headline
+    if headline:
+        queries.append(headline)
+
+    # Priority 3: Industry
+    if industry and len(queries) < 8:
+        queries.append(f"{industry} jobs")
+
+    # Priority 4: Top skills
+    if skills and len(queries) < 10:
+        for skill in skills[:2]:
+            if len(skill.split()) <= 3:
+                queries.append(f"{skill} specialist")
+
+    # Deduplicate
+    seen = set()
+    unique_queries = []
+    for q in queries:
+        q_clean = q.strip()
+        if q_clean and q_clean.lower() not in seen:
+            seen.add(q_clean.lower())
+            unique_queries.append(q_clean)
+
+    return unique_queries[:10], location
+
+
+# ============================================
+# SERPERDEV (GOOGLE JOBS)
+# ============================================
+
+def fetch_serperdev_jobs(queries: list, location: str = None) -> list:
+    """Fetch jobs from SerperDev /jobs endpoint
     
-    return queries, location
-
+    NOTE: Serper.dev free tier doesn't support /jobs endpoint.
+    The /jobs endpoint requires a paid plan ($50+/month).
+    Use search_orchestrator.py from the v2.0 upgrade for proper Serper integration.
+    """
+    logger.info("SerperDev: Skipping (free tier doesn't support /jobs endpoint)")
+    return []
 
 # ============================================
-# JSEARCH API (OPTIMIZED)
+# JSEARCH (RAPIDAPI)
 # ============================================
 
-def fetch_jsearch_jobs(queries: list, location: str = None, 
-                       per_query: int = 10) -> list:
-    """Fetch from JSearch API with optimized pagination"""
+def fetch_jsearch_jobs(queries: list, location: str = None) -> list:
+    """Fetch jobs from JSearch API"""
     if not JSEARCH_API_KEY:
-        logger.warning("JSearch API key missing")
+        logger.warning("JSearch: No API key found")
         return []
-    
+
+    if not queries:
+        return []
+
+    queries = queries[:JSEARCH_QUERIES]
+    logger.info(f"JSearch: Fetching {len(queries)} queries (location: {location or 'India'})")
+
     jobs = []
+    seen_urls = set()
+
     url = "https://jsearch.p.rapidapi.com/search"
-    
     headers = {
         "X-RapidAPI-Key": JSEARCH_API_KEY,
         "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
     }
-    
+
     for query in queries:
-        try:
-            params = {
-                "query": f"{query} {location}" if location else query,
-                "num_pages": 1,  # Single page only for speed
-                "page": 1,
-            }
-            
-            logger.info(f"JSearch query: {params['query']}")
-            response = requests.get(url, headers=headers, params=params, timeout=NETWORK_TIMEOUT)
-            response.raise_for_status()
-            data = response.json()
-            
-            for j in data.get("data", [])[:per_query]:
-                try:
-                    job = {
-                        "title": j.get("job_title", "Unknown"),
-                        "company": j.get("employer_name", "Unknown"),
-                        "summary": strip_html(j.get("job_description", "")[:500]),
-                        "apply_url": j.get("job_apply_link") or j.get("job_google_link", ""),
-                        "source": "JSearch",
-                        "location": j.get("job_city", "") or j.get("job_country", ""),
-                        "posted_date": j.get("job_posted_at_datetime_utc", ""),
-                    }
-                    job["location_tags"] = extract_location_from_job(job)
-                    
-                    if job["title"] and job["apply_url"]:
+        retry_count = 0
+        max_retries = 2
+        
+        while retry_count < max_retries:
+            try:
+                logger.info(f"JSearch: '{query}' (attempt {retry_count + 1}/{max_retries})")
+
+                params = {
+                    "query": f"{query} in {location or 'India'}",
+                    "page": "1",
+                    "num_pages": "1",
+                    "date_posted": "month"
+                }
+
+                # Increased timeout from 20 to 35 seconds
+                response = requests.get(url, headers=headers, params=params, timeout=35)
+
+                if response.status_code in [429, 403]:
+                    logger.warning(f"JSearch: HTTP {response.status_code}")
+                    break
+
+                response.raise_for_status()
+                data = response.json()
+
+                for result in data.get("data", []):
+                    try:
+                        title = result.get("job_title", "").strip()
+                        company = result.get("employer_name", "Unknown").strip()
+                        description = result.get("job_description", "").strip()
+
+                        link = result.get("job_apply_link") or result.get("job_google_link", "")
+
+                        if not title or not link or link in seen_urls:
+                            continue
+                        seen_urls.add(link)
+
+                        # Build location
+                        loc_parts = []
+                        if result.get("job_city"):
+                            loc_parts.append(result["job_city"])
+                        if result.get("job_state"):
+                            loc_parts.append(result["job_state"])
+                        job_location = ", ".join(loc_parts)
+
+                        # Determine source
+                        source = "Google Jobs"
+                        link_lower = link.lower()
+                        if "linkedin.com" in link_lower:
+                            source = "LinkedIn"
+                        elif "naukri.com" in link_lower:
+                            source = "Naukri"
+                        elif "indeed.com" in link_lower:
+                            source = "Indeed"
+
+                        job = {
+                            "title": title,
+                            "company": company,
+                            "summary": strip_html(description[:500]),
+                            "apply_url": link,
+                            "source": source,
+                            "location": job_location,
+                        }
+                        job["location_tags"] = extract_location_from_job(job)
                         jobs.append(job)
-                except Exception:
-                    continue
-            
-            time.sleep(0.5)  # Reduced delay
-            
-        except Exception as e:
-            logger.warning(f"JSearch error for '{query}': {e}")
-    
+
+                    except Exception:
+                        continue
+
+                # Success - break retry loop
+                break
+
+            except requests.Timeout:
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.warning(f"JSearch timeout, retrying ({retry_count}/{max_retries})...")
+                    time.sleep(2)
+                else:
+                    logger.warning(f"JSearch error for '{query}': Timeout after {max_retries} attempts")
+                    
+            except Exception as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.warning(f"JSearch error, retrying ({retry_count}/{max_retries})...")
+                    time.sleep(2)
+                else:
+                    logger.warning(f"JSearch error for '{query}': {e}")
+
+        time.sleep(1.0)
+
     logger.info(f"JSearch: {len(jobs)} jobs fetched")
     return jobs
 
 
 # ============================================
-# SERPAPI (OPTIMIZED)
+# SERPAPI (GOOGLE JOBS)
 # ============================================
 
-def fetch_serpapi_jobs(queries: list, location: str = None, 
-                       per_query: int = 10) -> list:
-    """Fetch from SerpAPI with optimized settings"""
+def fetch_serpapi_jobs(queries: list, location: str = None) -> list:
+    """Fetch jobs from SerpAPI"""
     if not SERPAPI_API_KEY:
-        logger.warning("SerpAPI key missing")
+        logger.warning("SerpAPI: No API key found")
         return []
-    
+
+    if not queries:
+        return []
+
+    queries = queries[:SERPAPI_QUERIES]
+    logger.info(f"SerpAPI: Fetching {len(queries)} queries (location: {location or 'India'})")
+
     jobs = []
-    
+    seen_urls = set()
+
     for query in queries:
         try:
+            logger.info(f"SerpAPI: '{query}'")
+
+            url = "https://serpapi.com/search"
+            
+            # Build search query with location for better local results
+            search_query = f"{query} in {location}" if location else query
+            
             params = {
-                "engine": "google_jobs",
-                "q": f"{query} {location}" if location else query,
-                "api_key": SERPAPI_API_KEY,
-                "num": per_query,
+                'engine': 'google_jobs',
+                'q': search_query,
+                'location': location or 'Bangalore, Karnataka, India',  # More specific default
+                'api_key': SERPAPI_API_KEY,
+                'hl': 'en',
+                'gl': 'in',  # Google country code for India
             }
-            
-            if location:
-                params["location"] = location
-            
-            logger.info(f"SerpAPI query: {params['q']}")
-            response = requests.get(
-                "https://serpapi.com/search",
-                params=params,
-                timeout=NETWORK_TIMEOUT
-            )
+
+            response = requests.get(url, params=params, timeout=30)
+
+            if response.status_code in [429, 403]:
+                logger.warning(f"SerpAPI: HTTP {response.status_code}")
+                break
+
             response.raise_for_status()
             data = response.json()
-            
-            for j in data.get("jobs_results", []):
+
+            for result in data.get('jobs_results', []):
                 try:
-                    title = j.get("title", "Unknown")
-                    company = j.get("company_name", "Unknown")
-                    description = j.get("description", "")
-                    link = j.get("share_url") or j.get("related_links", [{}])[0].get("link", "")
-                    job_location = j.get("location", "")
-                    
-                    source = "SerpAPI (Google Jobs)"
-                    
+                    title = result.get('title', '').strip()
+                    company = result.get('company_name', 'Unknown').strip()
+                    description = result.get('description', '').strip()
+                    link = result.get('apply_link') or result.get('share_link', '')
+                    job_location = result.get('location', '')
+
+                    if not title or not link or link in seen_urls:
+                        continue
+                    seen_urls.add(link)
+
+                    # Determine source
+                    source = "Google Jobs"
+                    link_lower = link.lower()
+                    if "linkedin.com" in link_lower:
+                        source = "LinkedIn"
+                    elif "naukri.com" in link_lower:
+                        source = "Naukri"
+                    elif "indeed.com" in link_lower:
+                        source = "Indeed"
+
                     job = {
                         "title": title,
                         "company": company,
@@ -383,14 +573,12 @@ def fetch_serpapi_jobs(queries: list, location: str = None,
                         "location": job_location,
                     }
                     job["location_tags"] = extract_location_from_job(job)
-                    
-                    if job["title"] and job["apply_url"]:
-                        jobs.append(job)
+                    jobs.append(job)
 
                 except Exception:
                     continue
 
-            time.sleep(0.5)  # Reduced delay
+            time.sleep(1.0)
 
         except Exception as e:
             logger.warning(f"SerpAPI error for '{query}': {e}")
@@ -400,51 +588,25 @@ def fetch_serpapi_jobs(queries: list, location: str = None,
 
 
 # ============================================
-# PARALLEL RSS FETCHING
-# ============================================
-
-def fetch_rss_parallel(feeds: list) -> list:
-    """Fetch multiple RSS feeds in parallel"""
-    all_jobs = []
-    
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_feed = {
-            executor.submit(parse_rss, feed_url, feed_name): (feed_url, feed_name)
-            for feed_url, feed_name in feeds
-        }
-        
-        for future in as_completed(future_to_feed):
-            try:
-                jobs = future.result(timeout=20)
-                all_jobs.extend(jobs)
-            except Exception as e:
-                feed_url, feed_name = future_to_feed[future]
-                logger.error(f"Failed to fetch {feed_name}: {e}")
-    
-    return all_jobs
-
-
-# ============================================
-# MAIN ORCHESTRATOR (OPTIMIZED)
+# MAIN ORCHESTRATOR
 # ============================================
 
 def fetch_all(output_path: str = None, profile: dict = None, 
               prioritize_local: bool = False) -> list:
     """
-    Optimized job fetching - targets 1-2 minute runtime
+    Fetch jobs from all sources with 3-API balance
     
-    Key optimizations:
-    - REMOVED: Lever companies (too slow)
-    - REMOVED: Himalayas (bloats results)
-    - Parallel RSS fetching
-    - Reduced API queries
-    - Lower timeouts and retries
-    - Streamlined RSS feeds
+    Strategy:
+    1. SerperDev: 4 queries (best for local)
+    2. JSearch: 3 queries (good aggregation)
+    3. SerpAPI: 3 queries (reliable fallback)
+    4. Lever + Remotive (free APIs)
+    5. RSS feeds (bulk free sources)
     """
     output_path = output_path or OUTPUT_DEFAULT
     all_jobs = []
 
-    logger.info("Starting OPTIMIZED job fetch")
+    logger.info("Starting job fetch from all sources")
 
     # Generate queries from profile
     if profile:
@@ -454,62 +616,104 @@ def fetch_all(output_path: str = None, profile: dict = None,
         queries = []
         location = None
 
-    # Layer 1: API sources (parallel where possible)
+    # Split queries across 3 APIs
     if queries:
-        jsearch_queries = queries[:JSEARCH_QUERIES]
-        serpapi_queries = queries[:SERPAPI_QUERIES]
+        serper_queries = queries[:SERPER_QUERIES]
+        jsearch_queries = queries[SERPER_QUERIES:SERPER_QUERIES+JSEARCH_QUERIES]
+        serpapi_queries = queries[SERPER_QUERIES+JSEARCH_QUERIES:SERPER_QUERIES+JSEARCH_QUERIES+SERPAPI_QUERIES]
 
-        logger.info(f"API split: JSearch={len(jsearch_queries)}, SerpAPI={len(serpapi_queries)}")
+        logger.info(f"API split: SerperDev={len(serper_queries)}, JSearch={len(jsearch_queries)}, SerpAPI={len(serpapi_queries)}")
 
-        # JSearch
+        # Layer 1: SerperDev (primary)
+        try:
+            jobs = fetch_serperdev_jobs(serper_queries, location)
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"SerperDev failed: {e}")
+
+        # Layer 2: JSearch (secondary)
         try:
             jobs = fetch_jsearch_jobs(jsearch_queries, location)
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"JSearch failed: {e}")
 
-        # SerpAPI
+        # Layer 3: SerpAPI (fallback)
         try:
             jobs = fetch_serpapi_jobs(serpapi_queries, location)
             all_jobs.extend(jobs)
         except Exception as e:
             logger.error(f"SerpAPI failed: {e}")
 
-    # Layer 2: Remotive (fast API)
+    # Layer 4: Lever
+    try:
+        jobs = fetch_lever_jobs()
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Lever failed: {e}")
+
+    # Layer 5: Remotive
     try:
         jobs = fetch_remotive_jobs()
         all_jobs.extend(jobs)
     except Exception as e:
         logger.error(f"Remotive failed: {e}")
 
-    # Layer 3: RSS feeds (PARALLEL for speed)
-    logger.info("Fetching RSS feeds in parallel")
-    
-    # Build feed list based on prioritization
-    feeds_to_fetch = []
+    # Layer 6: RSS feeds (CONDITIONAL - only fetch some if prioritizing local)
+    # Remote RSS feeds (WWR, RemoteOK) tend to dominate results, so limit them when user wants local jobs
+    logger.info("Fetching RSS feeds")
     
     if prioritize_local:
-        # Limit WWR when prioritizing local
-        for feed_url in WWR_FEEDS[:1]:  # Just programming
-            feeds_to_fetch.append((feed_url, "WeWorkRemotely"))
+        # When prioritizing local, fetch fewer WWR categories
+        logger.info("Local prioritization enabled - limiting remote RSS feeds")
+        wwr_feeds_to_fetch = WWR_FEEDS[:3]  # Programming, Customer Support, Product
     else:
-        # All WWR feeds for remote-first
-        for feed_url in WWR_FEEDS:
-            feeds_to_fetch.append((feed_url, "WeWorkRemotely"))
+        # Fetch all RSS feeds when user is remote-first
+        wwr_feeds_to_fetch = WWR_FEEDS
+
+    for feed_url in wwr_feeds_to_fetch:
+        try:
+            jobs = parse_rss(feed_url, "WeWorkRemotely")
+            all_jobs.extend(jobs)
+        except Exception as e:
+            logger.error(f"Failed to fetch {feed_url}: {e}")
+
+    # Conditionally fetch RemoteOK based on total job count
+    # If we have < 80 jobs so far, include RemoteOK even when prioritizing local
+    current_job_count = len(all_jobs)
+    should_fetch_remoteok = not prioritize_local or current_job_count < 80
     
-    # Always fetch these
-    feeds_to_fetch.extend([
-        (JOBICY, "Jobicy"),
-        (ADZUNA_INDIA, "Adzuna India"),
-    ])
+    if should_fetch_remoteok:
+        try:
+            jobs = parse_rss(REMOTEOK, "RemoteOK")
+            all_jobs.extend(jobs)
+            if prioritize_local:
+                logger.info(f"Fetched RemoteOK despite local priority (needed more jobs: {current_job_count} < 80)")
+        except Exception as e:
+            logger.error(f"RemoteOK failed: {e}")
+    else:
+        logger.info("Skipping RemoteOK (prioritizing local jobs)")
+
+    # Jobicy is smaller and often local, so always fetch
+    try:
+        jobs = parse_rss(JOBICY, "Jobicy")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Jobicy failed: {e}")
+
+    # Himalayas - high quality remote jobs, always fetch
+    try:
+        jobs = parse_rss(HIMALAYAS, "Himalayas")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Himalayas failed: {e}")
     
-    # Conditionally fetch RemoteOK
-    if not prioritize_local or len(all_jobs) < 60:
-        feeds_to_fetch.append((REMOTEOK, "RemoteOK"))
-    
-    # Fetch all RSS in parallel
-    rss_jobs = fetch_rss_parallel(feeds_to_fetch)
-    all_jobs.extend(rss_jobs)
+    # Adzuna India - India-focused aggregator, always fetch for local jobs
+    try:
+        jobs = parse_rss(ADZUNA_INDIA, "Adzuna India")
+        all_jobs.extend(jobs)
+    except Exception as e:
+        logger.error(f"Adzuna India failed: {e}")
 
     # Error check
     if not all_jobs:
