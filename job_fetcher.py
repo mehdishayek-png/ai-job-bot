@@ -99,18 +99,10 @@ WWR_FEEDS = [
 
 REMOTEOK = "https://remoteok.com/remote-jobs.rss"
 JOBICY = "https://jobicy.com/feed/"
-HIMALAYAS = "https://himalayas.app/jobs/rss"  # ~100 recent jobs, high quality, remote-friendly
+# REMOVED: HIMALAYAS = "https://himalayas.app/jobs/rss"  # Bloats results
 ADZUNA_INDIA = "https://www.adzuna.in/rss"  # India-focused job aggregator
 
-LEVER_COMPANIES = [
-    "razorpay", "postman", "hasura", "chargebee",
-    "browserstack", "clevertap", "druva", "freshworks",
-    "zeta-suite", "unacademy", "meesho", "cred",
-    "netflix", "figma", "notion", "stripe", "databricks",
-    "cloudflare", "twilio", "datadog", "gitlab",
-    "hubspot",
-]
-LEVER_PER_COMPANY = 20
+# REMOVED: Lever companies - too slow (45-60 seconds for 23 companies)
 
 # API query limits (rebalanced for local prioritization)
 # When prioritizing local: SerpAPI and JSearch get more queries (better local results)
@@ -242,68 +234,6 @@ def fetch_remotive_jobs(timeout: int = NETWORK_TIMEOUT) -> list:
     except Exception as e:
         logger.error(f"Remotive API error: {e}")
         return []
-
-
-# ============================================
-# LEVER API
-# ============================================
-
-def fetch_lever_jobs(companies: list = None, max_per_company: int = LEVER_PER_COMPANY) -> list:
-    """Fetch jobs from Lever public API"""
-    companies = companies or LEVER_COMPANIES
-    all_jobs = []
-    successful = 0
-
-    logger.info(f"Fetching from {len(companies)} Lever companies")
-
-    for company in companies:
-        try:
-            url = f"https://api.lever.co/v0/postings/{company}"
-            response = requests.get(url, timeout=10)
-
-            if response.status_code == 404:
-                continue
-
-            response.raise_for_status()
-            postings = response.json()
-
-            if not isinstance(postings, list):
-                continue
-
-            company_jobs = 0
-            for p in postings[:max_per_company]:
-                try:
-                    if not isinstance(p, dict):
-                        continue
-
-                    job = {
-                        "title": p.get("text", "Unknown").strip(),
-                        "company": company.replace("-", " ").title(),
-                        "summary": strip_html((p.get("description", "") or p.get("descriptionPlain", ""))[:500]),
-                        "apply_url": p.get("applyUrl") or p.get("hostedUrl", ""),
-                        "source": "Lever",
-                        "location": ", ".join(p.get("categories", {}).get("location", [])),
-                        "posted_date": p.get("createdAt", ""),
-                    }
-                    job["location_tags"] = extract_location_from_job(job)
-
-                    if job["title"] and job["apply_url"]:
-                        all_jobs.append(job)
-                        company_jobs += 1
-                except Exception:
-                    continue
-
-            if company_jobs > 0:
-                logger.info(f"Lever: {company} → {company_jobs} jobs")
-                successful += 1
-
-            time.sleep(0.3)
-
-        except Exception:
-            continue
-
-    logger.info(f"Lever total: {len(all_jobs)} jobs from {successful}/{len(companies)} companies")
-    return all_jobs
 
 
 # ============================================
@@ -645,21 +575,14 @@ def fetch_all(output_path: str = None, profile: dict = None,
         except Exception as e:
             logger.error(f"SerpAPI failed: {e}")
 
-    # Layer 4: Lever
-    try:
-        jobs = fetch_lever_jobs()
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Lever failed: {e}")
-
-    # Layer 5: Remotive
+    # Layer 4: Remotive (REMOVED Lever - too slow)
     try:
         jobs = fetch_remotive_jobs()
         all_jobs.extend(jobs)
     except Exception as e:
         logger.error(f"Remotive failed: {e}")
 
-    # Layer 6: RSS feeds (CONDITIONAL - only fetch some if prioritizing local)
+    # Layer 5: RSS feeds (CONDITIONAL - only fetch some if prioritizing local)
     # Remote RSS feeds (WWR, RemoteOK) tend to dominate results, so limit them when user wants local jobs
     logger.info("Fetching RSS feeds")
     
@@ -701,12 +624,7 @@ def fetch_all(output_path: str = None, profile: dict = None,
     except Exception as e:
         logger.error(f"Jobicy failed: {e}")
 
-    # Himalayas - high quality remote jobs, always fetch
-    try:
-        jobs = parse_rss(HIMALAYAS, "Himalayas")
-        all_jobs.extend(jobs)
-    except Exception as e:
-        logger.error(f"Himalayas failed: {e}")
+    # REMOVED: Himalayas - bloats with 100+ remote jobs
     
     # Adzuna India - India-focused aggregator, always fetch for local jobs
     try:
