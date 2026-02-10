@@ -91,68 +91,37 @@ def title_seniority(title):
 
 
 def estimate_years(profile):
-    """
-    Estimate years of experience from profile.
-    Checks: headline, skills count, and name format.
-    """
+    """Get years of experience — prefer user-selected value, fallback to headline parsing."""
+    # User-selected experience (from dropdown)
+    exp_str = (profile.get("experience", "") or "").strip()
+    EXP_MAP = {
+        "0–1 years": 0, "0-1 years": 0,
+        "1–3 years": 2, "1-3 years": 2,
+        "3–6 years": 4, "3-6 years": 4,
+        "6–10 years": 7, "6-10 years": 7,
+        "10+ years": 12,
+    }
+    if exp_str in EXP_MAP:
+        return EXP_MAP[exp_str]
+
+    # Fallback: parse from headline
     headline = (profile.get("headline", "") or "").lower()
-    skills = profile.get("skills", [])
-    
-    # Method 1: Explicit years in headline (most reliable)
     m = re.search(r'(\d+)\+?\s*(?:years?|yrs?)', headline)
     if m:
         return int(m.group(1))
-    
-    # Method 2: Seniority markers in headline
-    if any(w in headline for w in ["intern", "trainee", "fresher", "entry level", "entry-level"]):
+    if any(w in headline for w in ["intern", "trainee", "fresher"]):
         return 0
-    if any(w in headline for w in ["junior", "associate", "jr ", "jr."]):
+    if any(w in headline for w in ["junior", "associate", "jr "]):
         return 1
-    if any(w in headline for w in ["mid-level", "mid level", "intermediate"]):
-        return 3
-    if any(w in headline for w in ["senior", "sr ", "sr.", "lead"]):
-        return 6
-    if any(w in headline for w in ["staff", "principal"]):
-        return 8
-    if any(w in headline for w in ["manager", "team lead"]):
-        return 5
-    if any(w in headline for w in ["director", "head of", "vp ", "vice president"]):
-        return 10
-    if any(w in headline for w in ["chief", "cto", "coo", "ceo", "cfo", "executive"]):
-        return 12
-    
-    # Method 3: Role-based estimation (some roles imply experience)
-    if any(w in headline for w in ["architect", "consultant"]):
-        return 5
-    if any(w in headline for w in ["specialist", "analyst", "coordinator", "engineer", "developer"]):
-        # Check skill count as proxy for experience
-        skill_count = len(skills)
-        if skill_count >= 30:
-            return 5  # Lots of skills = experienced
-        elif skill_count >= 20:
-            return 4
-        elif skill_count >= 10:
-            return 3
-        else:
-            return 2
-    
-    # Method 4: Skill count as fallback (more skills = more experience)
-    skill_count = len(skills)
-    if skill_count >= 40:
-        return 7
-    elif skill_count >= 30:
-        return 5
-    elif skill_count >= 20:
-        return 4
-    elif skill_count >= 15:
-        return 3
-    elif skill_count >= 10:
+    if any(w in headline for w in ["specialist", "analyst", "coordinator"]):
         return 2
-    elif skill_count >= 5:
-        return 1
-    
-    # Default: assume early career
-    return 1
+    if any(w in headline for w in ["consultant"]):
+        return 2
+    if any(w in headline for w in ["senior", "sr ", "lead", "manager"]):
+        return 5
+    if any(w in headline for w in ["director", "head of", "vp "]):
+        return 10
+    return 2
 
 
 # ============================================
@@ -166,7 +135,7 @@ def extract_profile_keywords(profile):
 
     Primary = specific tools/platforms/domains (high signal)
     Secondary = general professional terms (lower signal)
-    Title = words from headline for title matching + SYNONYMS
+    Title = words from headline for title matching
     """
     skills = [s.lower().strip() for s in profile.get("skills", []) if s]
     headline = (profile.get("headline", "") or "").lower()
@@ -182,62 +151,7 @@ def extract_profile_keywords(profile):
         if len(term) > 2:
             primary.add(term.strip())
 
-    # ---- NEW: Job Title Synonyms/Semantic Matching ----
-    # Map common job titles to their semantic equivalents
-    TITLE_SYNONYMS = {
-        # Construction & Project Management
-        "construction": ["construction", "building", "project", "site", "contractor", "general contractor"],
-        "construction manager": ["construction manager", "construction supervisor", "project manager", "site manager", "construction lead", "project coordinator", "pm"],
-        "project manager": ["project manager", "program manager", "construction manager", "project lead", "pm", "pmo", "delivery manager"],
-        "construction supervisor": ["construction supervisor", "site supervisor", "construction manager", "foreman", "site lead"],
-        
-        # Customer Support & Success
-        "customer support": ["customer support", "customer service", "technical support", "support specialist", "help desk", "customer care"],
-        "customer success": ["customer success", "customer support", "client success", "account manager", "customer experience"],
-        "customer experience": ["customer experience", "cx specialist", "customer success", "customer support", "client experience"],
-        "support specialist": ["support specialist", "support engineer", "customer support", "technical support", "help desk"],
-        
-        # Engineering & Development
-        "software engineer": ["software engineer", "software developer", "developer", "engineer", "programmer", "sde"],
-        "developer": ["developer", "software developer", "software engineer", "engineer", "programmer", "coder"],
-        "engineer": ["engineer", "software engineer", "developer", "technical engineer", "solutions engineer"],
-        "full stack": ["full stack", "fullstack", "full-stack developer", "software engineer", "web developer"],
-        
-        # Data & Analytics
-        "data analyst": ["data analyst", "business analyst", "analytics", "data specialist", "analyst"],
-        "business analyst": ["business analyst", "data analyst", "analyst", "ba", "business intelligence"],
-        "analyst": ["analyst", "data analyst", "business analyst", "research analyst", "systems analyst"],
-        
-        # Sales & Marketing
-        "account manager": ["account manager", "customer success", "account executive", "client manager", "relationship manager"],
-        "account executive": ["account executive", "sales executive", "ae", "account manager", "sales representative"],
-        "sales": ["sales", "business development", "account executive", "sales representative", "sales engineer"],
-        
-        # Operations & Management
-        "operations": ["operations", "ops", "operations manager", "operations specialist", "operational"],
-        "consultant": ["consultant", "consulting", "advisor", "specialist", "expert"],
-        "coordinator": ["coordinator", "specialist", "associate", "administrator", "organizer"],
-        
-        # Design & Creative
-        "designer": ["designer", "ui designer", "ux designer", "graphic designer", "product designer", "visual designer"],
-        "product designer": ["product designer", "ux designer", "ui/ux designer", "designer", "user experience designer"],
-    }
-    
-    # Extract job title synonyms from headline
-    title_synonyms = set()
-    for base_title, synonyms in TITLE_SYNONYMS.items():
-        if base_title in headline:
-            for synonym in synonyms:
-                title_synonyms.add(synonym)
-                # Also add individual words from multi-word synonyms
-                for word in synonym.split():
-                    if len(word) > 2:
-                        title_synonyms.add(word)
-    
-    # Add title synonyms to primary keywords
-    primary = primary | title_synonyms
-
-    # ---- Expand keywords for broader matching ----
+    # ---- NEW: Expand keywords for broader matching ----
     # Break multi-word skills into individual meaningful words
     expanded = set()
     stop_words = {
@@ -403,6 +317,7 @@ def score_job_locally(job, primary_kw, secondary_kw, title_words, candidate_year
 def llm_batch_score(batch, profile, candidate_years):
     skills_str = ", ".join(profile.get("skills", [])[:15])
     headline = profile.get("headline", "Professional")
+    industry = profile.get("industry", "")
     
     jobs_text = "\n\n".join([
         f"JOB {i+1}:\nTitle: {j.get('title', '?')}\nCompany: {j.get('company', '?')}\n"
@@ -410,22 +325,30 @@ def llm_batch_score(batch, profile, candidate_years):
         for i, j in enumerate(batch)
     ])
 
+    industry_note = f"\n- Industry: {industry}" if industry else ""
+
     prompt = f"""You are a job matching expert. Score these {len(batch)} jobs for this candidate.
 
 Candidate profile:
-- Headline: {headline}
+- Headline: {headline}{industry_note}
 - Skills: {skills_str}
 - Experience: ~{candidate_years} years
 
 Jobs to score:
 {jobs_text}
 
-For each job, provide a score 0-100 based on:
-- Skills match (50% weight)
-- Role fit (30% weight)
-- Seniority alignment (20% weight)
+SCORING RULES (0-100):
+- 80-100: Strong match — same industry, relevant title, skills overlap significantly
+- 60-79: Good match — related role, some skills overlap, could be a stretch but realistic
+- 40-59: Weak match — tangentially related, different industry or role type
+- 0-39: No match — completely different field, wrong seniority, or unrelated skills
 
-CRITICAL: Return ONLY a JSON array of {len(batch)} integers, nothing else.
+IMPORTANT:
+- A "{headline}" should NOT match "Software Engineer", "Data Engineer", "DevOps" roles unless the skills specifically align
+- Consider the candidate's INDUSTRY ({industry or 'general'}) — a fintech ops person should match fintech/payments jobs, not healthcare or construction
+- Score based on whether the candidate would ACTUALLY apply and be considered, not just keyword overlap
+
+Return ONLY a JSON array of {len(batch)} integers, nothing else.
 Example: [75, 60, 45, 90, ...]
 
 Scores:"""
@@ -574,19 +497,23 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     # ---- Fetch jobs if needed ----
     if not os.path.exists(jobs_file):
         if progress_callback:
-            progress_callback("📡 Fetching jobs from all sources...")
+            progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
         from job_fetcher import fetch_all, build_serpapi_queries
 
         # Generate profile-based SerpAPI queries for India-focused search
         serpapi_queries = build_serpapi_queries(profile)
         logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
-        if progress_callback:
-            progress_callback(f"🔍 Running {len(serpapi_queries)} targeted searches...")
 
-        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries)
-        
-        if progress_callback:
-            progress_callback("✅ Job fetching complete!")
+        # Determine whether to prioritize local sources based on profile location preferences
+        location_prefs = profile.get("location_preferences", ["global"])
+        # Prioritize local if user explicitly selected regions OR if user has a country/state set
+        has_country = bool((profile.get("country", "") or "").strip()) and (profile.get("country", "").strip().lower() not in ("remote only", "remote", "global"))
+        has_state = bool((profile.get("state", "") or "").strip() and profile.get("state", "") != "Any")
+        prioritize_local = bool((location_prefs and location_prefs != ["global"]) or has_country or has_state)
+        if prioritize_local:
+            logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
+
+        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
@@ -596,13 +523,64 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     jobs = deduplicate_jobs(jobs)
     total_unique = len(jobs)
     if progress_callback:
-        progress_callback(f"📊 Loaded {total_unique} unique jobs from all sources")
+        progress_callback(f"Loaded {total_unique} unique jobs")
+
+    # If user requested local results, prefer local jobs by reordering the list
+    location_prefs = profile.get("location_preferences", ["global"])
+    prioritize_local_run = bool(location_prefs and location_prefs != ["global"]) or bool(user_country_lc)
+    if prioritize_local_run:
+        # Build a simple local-match predicate using country_aliases and location_tags
+        def is_local_job(job):
+            jt = f"{job.get('title','')} {job.get('summary','')} {job.get('company','')} {job.get('source','')}".lower()
+            if any(alias in jt for alias in country_aliases):
+                return True
+            tags = job.get('location_tags', [])
+            if isinstance(tags, (list, tuple)) and any(t in ('asia', user_country_lc) for t in tags):
+                return True
+            return False
+
+        local_jobs = [j for j in jobs if is_local_job(j)]
+        other_jobs = [j for j in jobs if not is_local_job(j)]
+        if local_jobs:
+            logger.info(f"Local prioritization: {len(local_jobs)} local jobs found; reordering to favour them")
+            jobs = local_jobs + other_jobs
 
     # ============================================
     # NEW: Filter by location preferences (Phase 1)
     # ============================================
     location_prefs = profile.get("location_preferences", ["global"])
-    
+
+    # If the user didn't explicitly select regions but has a country/state,
+    # derive a sensible region preference so we actually filter local jobs.
+    if (not location_prefs or location_prefs == ["global"]) and (user_country_lc or user_state):
+        COUNTRY_TO_REGION = {
+            "india": "asia",
+            "united states": "americas",
+            "usa": "americas",
+            "canada": "americas",
+            "united kingdom": "europe",
+            "uk": "europe",
+            "germany": "europe",
+            "australia": "asia",
+            "uae": "asia",
+            "saudi arabia": "asia",
+            "singapore": "asia",
+            "netherlands": "europe",
+            "france": "europe",
+            "ireland": "europe",
+        }
+        derived = None
+        if user_country_lc in COUNTRY_TO_REGION:
+            derived = COUNTRY_TO_REGION[user_country_lc]
+        else:
+            # try to infer from state/city
+            st_lc = user_state.lower() if user_state else ""
+            if "bengaluru" in st_lc or "bangalore" in st_lc or "india" in st_lc:
+                derived = "asia"
+        if derived:
+            location_prefs = [derived]
+            logger.info(f"Derived location_prefs from profile: {location_prefs}")
+
     # If user has location preferences, filter jobs
     if location_prefs and location_prefs != ["global"]:
         jobs_before = len(jobs)
@@ -611,7 +589,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         
         logger.info(f"Location filter: {jobs_before} → {jobs_after} jobs (preferences: {location_prefs})")
         if progress_callback:
-            progress_callback(f"🌍 Location filter: {jobs_after} jobs match your preferences")
+            progress_callback(f"Location filter: {jobs_after} jobs match your region preferences")
     else:
         logger.info("No location filtering (user prefers global)")
 
@@ -620,17 +598,13 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     logger.info(f"Keywords — primary: {len(primary_kw)}, secondary: {len(secondary_kw)}, title: {len(title_words)}")
     logger.info(f"Primary keywords: {sorted(primary_kw)[:15]}")
     if progress_callback:
-        progress_callback(f"🎯 Phase 1: Keyword matching ({len(primary_kw)} skills + title synonyms)...")
+        progress_callback(f"Matching against {len(primary_kw)} primary keywords...")
 
     # ---- Phase 1: Local keyword scoring (0 API calls) ----
     scored_jobs = []
     filtered_stats = {"non_english": 0, "too_senior": 0, "low_score": 0, "passed": 0}
 
-    for i, job in enumerate(jobs):
-        # Progress update every 50 jobs
-        if progress_callback and i > 0 and i % 50 == 0:
-            progress_callback(f"⚡ Analyzing job {i}/{len(jobs)}... ({filtered_stats['passed']} matches so far)")
-        
+    for job in jobs:
         title = job.get("title", "")
         summary = job.get("summary", "")
 
@@ -662,15 +636,15 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
                 f"{filtered_stats['non_english']} non-English)")
     if progress_callback:
         progress_callback(
-            f"✅ Phase 1 complete: {filtered_stats['passed']} relevant jobs "
-            f"(filtered {filtered_stats['too_senior']} senior + {filtered_stats['low_score']} low match)"
+            f"Keyword matching: {filtered_stats['passed']} relevant jobs found "
+            f"({filtered_stats['too_senior']} too senior, {filtered_stats['low_score']} filtered)"
         )
 
     if not scored_jobs:
         # Fallback: if keyword matching is too strict, lower threshold and try again
         logger.info("Zero keyword matches — retrying with threshold=20")
         if progress_callback:
-            progress_callback("⚠️ No matches at standard threshold — broadening search...")
+            progress_callback("Keywords too specific — broadening search...")
         for job in jobs:
             title = job.get("title", "")
             summary = job.get("summary", "")
@@ -686,18 +660,18 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         scored_jobs.sort(key=lambda j: j.get("_local_score", 0), reverse=True)
         logger.info(f"Fallback: {len(scored_jobs)} jobs passed at threshold=20")
         if progress_callback:
-            progress_callback(f"✅ Broadened search: {len(scored_jobs)} candidates found")
+            progress_callback(f"Broadened search: {len(scored_jobs)} candidates for LLM")
 
     if not scored_jobs:
         if progress_callback:
-            progress_callback("❌ No relevant jobs found. Profile may be too niche for available boards.")
+            progress_callback("No relevant jobs found. Your profile may be too niche for these job boards.")
         return [], total_unique
 
     # ---- Phase 2: LLM scoring for top candidates only ----
     top_candidates = scored_jobs[:MAX_LLM_CANDIDATES]
 
     if progress_callback:
-        progress_callback(f"🤖 Phase 2: AI ranking top {len(top_candidates)} candidates...")
+        progress_callback(f"Sending top {len(top_candidates)} to LLM for final scoring...")
 
     # Cache
     p_hash = profile_hash(profile)
@@ -734,7 +708,8 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         tb = (len(uncached) + LLM_BATCH_SIZE - 1) // LLM_BATCH_SIZE
 
         if progress_callback:
-            progress_callback(f"🧠 AI Batch {bn}/{tb}: Scoring {len(batch)} jobs...")
+            titles = [f"{j.get('company','?')[:15]}: {j.get('title','?')[:30]}" for j in batch]
+            progress_callback(f"Batch {bn}/{tb}: {', '.join(titles)}")
 
         scores = llm_batch_score(batch, profile, candidate_years)
         api_calls += 1
@@ -749,8 +724,9 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             # These are more likely to be relevant, recently posted, and actually hiring
             source = job.get("source", "").lower()
             PRIORITY_SOURCES = {"google jobs", "indeed", "naukri", "linkedin", "instahyre", "foundit", "glassdoor"}
+            priority_boost = 10 if prioritize_local_run else 5
             if source in PRIORITY_SOURCES:
-                combined = min(combined + 5, 100)
+                combined = min(combined + priority_boost, 100)
 
             # Location boost: +8 if job mentions user's country or state/city
             if user_country_lc and user_country_lc != "remote only":
@@ -767,8 +743,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
                         f"→ local={local_score}, llm={llm_score}, combined={combined}")
 
         if progress_callback:
-            avg_score = sum(scores) // len(scores) if scores else 0
-            progress_callback(f"  ✓ Batch {bn} complete - avg score: {avg_score}%")
+            progress_callback(f"  → LLM scores: [{', '.join(str(s) for s in scores)}]")
 
         if i + LLM_BATCH_SIZE < len(uncached):
             time.sleep(API_RATE_LIMIT)
@@ -780,9 +755,6 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     all_results.extend(scored_results)
 
     # ---- Phase 3: Filter, diversify, sort ----
-    if progress_callback:
-        progress_callback(f"🎯 Phase 3: Filtering and ranking final matches...")
-    
     # Adaptive threshold: try 55, then 50, then 45 to ensure we always return something
     for threshold in [55, 50, 45]:
         matches = []
@@ -797,8 +769,6 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
 
         if matches:
             logger.info(f"Threshold {threshold} yielded {len(matches)} matches")
-            if progress_callback:
-                progress_callback(f"✓ Found {len(matches)} strong matches (threshold: {threshold}%)")
             break
         else:
             logger.info(f"Threshold {threshold} yielded 0 — trying lower")
@@ -809,7 +779,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
 
     logger.info(f"Final: {len(matches)} matches from {len(top_candidates)} candidates ({api_calls} API calls)")
     if progress_callback:
-        progress_callback(f"✅ Complete! {len(matches)} top matches ready ({api_calls} API calls used)")
+        progress_callback(f"✅ {len(matches)} matches found ({api_calls} API calls)")
 
     # ---- Save cache ----
     os.makedirs(session_dir, exist_ok=True)

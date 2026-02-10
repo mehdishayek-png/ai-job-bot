@@ -102,26 +102,35 @@ def extract_headline(lines):
 # =========================
 
 def extract_profile_with_llm(text):
-    """Use LLM to extract name, headline, and skills in one call"""
+    """Use LLM to extract name, headline, skills, and search terms in one call"""
     
     prompt = f"""Extract the following from this resume and return ONLY valid JSON:
 
 1. name: Full name of the candidate
-2. headline: Current job title or professional headline (e.g. "IT Consultant" or "Customer Support Specialist")
-3. skills: List of SPECIFIC, MATCHABLE professional skills
+2. headline: Current job title or professional headline (e.g. "Business Operations Lead" or "IT Consultant")
+3. skills: List of 8-15 SPECIFIC, SEARCHABLE professional skills that a recruiter would use as keywords
+4. industry: The primary industry/domain (e.g. "fintech", "e-commerce", "healthcare", "SaaS")
+5. search_terms: 3-5 job title variations this person would search for on job boards
 
-SKILLS RULES — this is critical:
-- Include specific tools and platforms: "Oracle OMS", "Zendesk", "JIRA", "Salesforce", "SQL"
-- Include specific domains: "order management", "marketplace integration", "incident management"  
-- Include specific methodologies: "ITIL", "Agile", "SLA management", "root cause analysis"
-- Include specific technologies: "SOA Suite", "REST API", "SOAP", "Linux"
-- DO NOT include soft skills like "communication", "leadership", "problem solving", "teamwork"
-- DO NOT include generic terms like "Microsoft Office", "email", "Google Docs"
-- DO NOT include languages spoken like "English", "Hindi"
-- Each skill should be something a recruiter would SEARCH FOR in a job posting
+SKILLS RULES — read carefully:
+- Extract DOMAIN-SPECIFIC skills, NOT generic ones
+- GOOD examples: "payment gateway integration", "UPI services", "merchant onboarding", "digital payments", "fintech operations", "loyalty programs", "gift card management", "prepaid cards", "BBPS", "order fulfillment", "vendor management"
+- BAD examples: "ai modules", "api mappings", "aeps", "modules" (too vague/niche to match job postings)
+- Include specific tools/platforms: "Salesforce", "JIRA", "SAP", "REST API"
+- Include specific methodologies: "Agile", "process automation", "reconciliation"
+- DO NOT include soft skills: "communication", "leadership", "problem solving", "teamwork"
+- DO NOT include generic office tools: "Microsoft Office", "Excel", "PowerPoint", "Word"
+- DO NOT include languages spoken
+- Each skill should realistically appear in a job posting the candidate would apply to
+
+SEARCH_TERMS RULES:
+- These are job TITLES the person would search for, not skills
+- Think: what would this person type into LinkedIn/Indeed/Naukri?
+- GOOD: ["Business Operations Manager", "Fintech Operations Lead", "Payment Operations Manager", "Operations Manager fintech"]
+- BAD: ["API integration jobs", "lead jobs"] (too vague)
 
 Return ONLY a JSON object:
-{{"name": "...", "headline": "...", "skills": ["specific skill 1", "specific skill 2", ...]}}
+{{"name": "...", "headline": "...", "skills": [...], "industry": "...", "search_terms": [...]}}
 
 Resume text:
 {text[:6000]}
@@ -133,7 +142,7 @@ JSON:"""
             model=MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=500,
+            max_tokens=600,
         )
 
         response_text = res.choices[0].message.content.strip()
@@ -153,6 +162,8 @@ JSON:"""
         profile_data.setdefault("name", "Candidate")
         profile_data.setdefault("headline", "")
         profile_data.setdefault("skills", [])
+        profile_data.setdefault("industry", "")
+        profile_data.setdefault("search_terms", [])
         
         # Ensure skills is a list
         if not isinstance(profile_data["skills"], list):
@@ -163,6 +174,14 @@ JSON:"""
             s.strip().lower() for s in profile_data["skills"] 
             if isinstance(s, str) and s.strip()
         ]))
+        
+        # Clean search_terms
+        if not isinstance(profile_data["search_terms"], list):
+            profile_data["search_terms"] = []
+        profile_data["search_terms"] = [
+            s.strip() for s in profile_data["search_terms"]
+            if isinstance(s, str) and s.strip()
+        ][:5]
         
         return profile_data
 
