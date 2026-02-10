@@ -25,266 +25,194 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-/* ============ GLOBAL RESET ============ */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* ============ GLOBAL ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 .stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-    background-attachment: fixed;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f8f9fc;
 }
 
 h1, h2, h3, h4, h5, h6,
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
-    font-family: 'Inter', sans-serif !important;
+    font-family: 'DM Sans', sans-serif !important;
     font-weight: 700 !important;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
+    color: #1a1a2e !important;
 }
+
+p, li, span, div { color: #3d3d56; }
 
 code, .stCode, pre {
     font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* ============ GLASSMORPHISM FOUNDATION ============ */
-.glass {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-}
-
-.glass-strong {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(25px) saturate(200%);
-    -webkit-backdrop-filter: blur(25px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.45);
-}
-
-/* ============ HERO SECTION ============ */
+/* ============ HERO ============ */
 .hero {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: 24px;
-    padding: 3rem 2.5rem;
-    margin-bottom: 2rem;
+    background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 60%, #74b9ff 100%);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    margin-bottom: 1.5rem;
     position: relative;
     overflow: hidden;
-    box-shadow: 
-        0 8px 32px 0 rgba(139, 92, 246, 0.2),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 24px rgba(108, 92, 231, 0.2);
 }
 
 .hero::before {
     content: '';
     position: absolute;
-    top: -50%;
-    right: -20%;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, transparent 70%);
-    filter: blur(60px);
-    animation: float 8s ease-in-out infinite;
+    top: -40%;
+    right: -15%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+    filter: blur(40px);
 }
 
-.hero::after {
-    content: '';
-    position: absolute;
-    bottom: -30%;
-    left: -10%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
-    filter: blur(60px);
-    animation: float 10s ease-in-out infinite reverse;
-}
-
-@keyframes float {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(30px, -20px) scale(1.1); }
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-}
+.hero-content { position: relative; z-index: 1; }
 
 .hero h1 {
     color: #ffffff !important;
-    font-size: 3rem !important;
+    font-size: 2.5rem !important;
     font-weight: 800 !important;
-    margin: 0 0 0.5rem 0 !important;
-    background: linear-gradient(135deg, #ffffff 0%, #a78bfa 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    margin: 0 0 0.4rem 0 !important;
     line-height: 1.1;
 }
 
 .hero-subtitle {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 1.15rem;
-    margin: 0 0 1.5rem 0;
+    color: rgba(255,255,255,0.85);
+    font-size: 1.05rem;
+    margin: 0 0 1.2rem 0;
     font-weight: 400;
-    line-height: 1.6;
+    line-height: 1.5;
 }
 
 .hero-tags {
     display: flex;
-    gap: 0.75rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    margin-top: 1.5rem;
+    margin-top: 1rem;
 }
 
 .hero-tag {
-    background: rgba(139, 92, 246, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    color: #c4b5fd;
-    padding: 0.5rem 1rem;
-    border-radius: 12px;
-    font-size: 0.85rem;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 0.4rem 0.85rem;
+    border-radius: 10px;
+    font-size: 0.8rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.hero-tag:hover {
-    background: rgba(139, 92, 246, 0.25);
-    border-color: rgba(139, 92, 246, 0.5);
-    transform: translateY(-2px);
-}
-
-/* ============ STEPPER PROGRESS ============ */
+/* ============ STEPPER ============ */
 .stepper {
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 1rem;
-    margin: 2rem 0 2.5rem;
-    padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px;
+    gap: 0.75rem;
+    margin: 1.5rem 0 2rem;
+    padding: 1rem;
+    background: #fff;
+    border: 1px solid #e8e8f0;
+    border-radius: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 .step {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1.25rem;
-    border-radius: 12px;
-    font-size: 0.9rem;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
     font-weight: 600;
-    transition: all 0.3s ease;
+    color: #6c6c8a;
 }
 
 .step-icon {
-    width: 36px;
-    height: 36px;
+    width: 32px; height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
+    font-size: 1rem;
 }
 
-.step.done {
-    color: #6ee7b7;
-}
-
+.step.done { color: #059669; }
 .step.done .step-icon {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    background: #059669;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(5,150,105,0.25);
 }
 
 .step.active {
-    color: #c4b5fd;
-    background: rgba(139, 92, 246, 0.1);
+    color: #6c5ce7;
+    background: #f0edff;
 }
-
 .step.active .step-icon {
-    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.5);
+    background: #6c5ce7;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(108,92,231,0.3);
     animation: pulse 2s ease-in-out infinite;
 }
 
-.step.pending {
-    color: rgba(255, 255, 255, 0.3);
-}
-
+.step.pending { color: #c0c0d0; }
 .step.pending .step-icon {
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px dashed rgba(255, 255, 255, 0.15);
+    background: #f0f0f5;
+    border: 2px dashed #d0d0dd;
 }
 
 .step-connector {
-    width: 60px;
-    height: 2px;
-    background: linear-gradient(90deg, 
-        rgba(255, 255, 255, 0.2) 0%, 
-        rgba(255, 255, 255, 0.05) 100%
-    );
+    width: 40px; height: 2px;
+    background: #e0e0ea;
 }
 
 @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.9; }
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
 }
 
-/* ============ GLASS CARDS ============ */
+/* ============ CARDS ============ */
 .glass-card {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 2rem;
-    margin-bottom: 1.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
+    background: #ffffff;
+    border: 1px solid #e8e8f0;
+    border-radius: 16px;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 .glass-card:hover {
-    border-color: rgba(139, 92, 246, 0.3);
-    box-shadow: 0 12px 40px 0 rgba(139, 92, 246, 0.3);
-    transform: translateY(-2px);
+    border-color: #d0cfe8;
+    box-shadow: 0 4px 16px rgba(108,92,231,0.08);
 }
 
 .card-header {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
 }
 
 .card-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
+    width: 42px; height: 42px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    background: rgba(139, 92, 246, 0.15);
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    font-size: 1.3rem;
+    background: #f0edff;
+    border: 1px solid #e0dcf5;
 }
 
 .card-title {
-    font-size: 1.35rem !important;
+    font-size: 1.2rem !important;
     font-weight: 700 !important;
-    color: #ffffff !important;
+    color: #1a1a2e !important;
     margin: 0 !important;
 }
 
@@ -292,208 +220,201 @@ code, .stCode, pre {
 .skills-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-top: 1rem;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
 }
 
 .skill-chip {
-    background: rgba(139, 92, 246, 0.12);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(139, 92, 246, 0.25);
-    color: #c4b5fd;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
-    font-size: 0.85rem;
+    background: #f0edff;
+    border: 1px solid #e0dcf5;
+    color: #6c5ce7;
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
     font-weight: 600;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: default;
 }
 
-.skill-chip:hover {
-    background: rgba(139, 92, 246, 0.2);
-    border-color: rgba(139, 92, 246, 0.4);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-}
-
-/* ============ STATS DASHBOARD ============ */
+/* ============ STATS ============ */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.25rem;
-    margin: 2rem 0;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
 }
 
 .stat-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 18px;
-    padding: 1.75rem 1.5rem;
+    background: #fff;
+    border: 1px solid #e8e8f0;
+    border-radius: 14px;
+    padding: 1.25rem 1rem;
     text-align: center;
-    transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(139, 92, 246, 0.3);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #6c5ce7;
     line-height: 1;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.3rem;
 }
 
 .stat-label {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.9rem;
-    font-weight: 500;
+    color: #8888a0;
+    font-size: 0.8rem;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
 }
 
 /* ============ SCORE BADGES ============ */
 .score-badge {
     display: inline-block;
-    padding: 0.5rem 1.25rem;
-    border-radius: 12px;
-    font-size: 1rem;
+    padding: 0.4rem 1rem;
+    border-radius: 10px;
+    font-size: 0.95rem;
     font-weight: 700;
-    letter-spacing: 0.02em;
     text-align: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .score-excellent {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    background: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
 }
-
 .score-good {
-    background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    background: #fffbeb;
+    color: #d97706;
+    border: 1px solid #fde68a;
 }
-
 .score-fair {
-    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+    background: #f0edff;
+    color: #6c5ce7;
+    border: 1px solid #e0dcf5;
 }
 
 /* ============ SOURCE BADGES ============ */
 .source-badge {
     display: inline-block;
-    padding: 0.35rem 0.85rem;
-    border-radius: 8px;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    letter-spacing: 0.04em;
+    background: #eef2ff;
+    color: #6366f1;
+    border: 1px solid #ddd6fe;
 }
 
 /* ============ BUTTONS ============ */
 .stButton > button {
-    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%) !important;
+    background: #6c5ce7 !important;
     color: white !important;
     border: none !important;
-    border-radius: 12px !important;
-    padding: 0.75rem 1.5rem !important;
+    border-radius: 10px !important;
+    padding: 0.65rem 1.25rem !important;
     font-weight: 600 !important;
-    font-size: 1rem !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3) !important;
+    font-size: 0.95rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(108,92,231,0.2) !important;
 }
 
 .stButton > button:hover {
-    background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4) !important;
+    background: #5b4bd5 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(108,92,231,0.3) !important;
+}
+
+/* ============ EXPANDERS (job cards) ============ */
+.streamlit-expanderHeader {
+    background: #fff !important;
+    border: 1px solid #e8e8f0 !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    color: #1a1a2e !important;
+}
+
+/* ============ INPUTS ============ */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div {
+    background: #fff !important;
+    border: 1px solid #e0e0ea !important;
+    border-radius: 10px !important;
+    color: #1a1a2e !important;
 }
 
 /* ============ DIVIDER ============ */
 .divider {
     height: 1px;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(139, 92, 246, 0.3) 50%, 
-        transparent 100%
-    );
-    margin: 2.5rem 0;
+    background: linear-gradient(90deg, transparent 0%, #e0e0ea 50%, transparent 100%);
+    margin: 2rem 0;
 }
 
-/* ============ COVER LETTER DISPLAY ============ */
+/* ============ COVER LETTER ============ */
 .cover-letter-box {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-top: 1rem;
-    color: rgba(255, 255, 255, 0.85);
-    line-height: 1.8;
-    font-size: 0.95rem;
+    background: #f8f8fc;
+    border: 1px solid #e8e8f0;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-top: 0.75rem;
+    color: #3d3d56;
+    line-height: 1.7;
+    font-size: 0.9rem;
 }
 
 .cover-letter-label {
-    color: #c4b5fd;
+    color: #6c5ce7;
     font-weight: 600;
-    font-size: 0.9rem;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
 }
 
 /* ============ SCROLLBAR ============ */
-::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(139, 92, 246, 0.3);
-    border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(139, 92, 246, 0.5);
-}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f0f0f5; }
+::-webkit-scrollbar-thumb { background: #d0cfe8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #b0afd0; }
 
 /* ============ FOOTER ============ */
 .footer {
     text-align: center;
-    padding: 2rem 1rem;
-    margin-top: 4rem;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 0.85rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1.5rem 1rem;
+    margin-top: 3rem;
+    color: #999;
+    font-size: 0.8rem;
+    border-top: 1px solid #e8e8f0;
 }
+.footer a { color: #6c5ce7; text-decoration: none; font-weight: 600; }
+.footer a:hover { color: #5b4bd5; }
 
-.footer a {
-    color: #8b5cf6;
-    text-decoration: none;
-    font-weight: 600;
+/* ============ SIDEBAR ============ */
+section[data-testid="stSidebar"] {
+    background: #fff;
+    border-right: 1px solid #e8e8f0;
 }
+section[data-testid="stSidebar"] * { color: #3d3d56; }
 
-.footer a:hover {
-    color: #a78bfa;
-}
+/* ============ STREAMLIT OVERRIDES ============ */
+/* Fix text colors in expanders, markdown, captions */
+.stMarkdown, .stMarkdown p, .stCaption, .stText { color: #3d3d56 !important; }
+.stAlert p { color: inherit !important; }
+label, .stSelectbox label, .stTextInput label, .stTextArea label { color: #3d3d56 !important; }
+
+/* Expander content readability */
+div[data-testid="stExpander"] details summary span { color: #1a1a2e !important; }
+div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p { color: #3d3d56 !important; }
+
+/* Progress bar */
+.stProgress > div > div > div { background: #6c5ce7 !important; }
+
+/* Links */
+a { color: #6c5ce7; }
+a:hover { color: #5b4bd5; }
+
+/* Code blocks in progress */
+.stCodeBlock, pre { background: #f8f8fc !important; color: #3d3d56 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -505,8 +426,6 @@ load_dotenv()
 
 # ============================================
 # MODULE RELOAD — Critical for Streamlit hot-reload
-# Without this, Streamlit caches old module versions
-# and new code (like Lever/SerpAPI) never runs
 # ============================================
 import importlib
 import sys
@@ -519,12 +438,12 @@ _modules_to_reload = [
     "cover_letter_generator",
 ]
 for _mod in _modules_to_reload:
-    try:
-        if _mod in sys.modules:
+    if _mod in sys.modules:
+        try:
             importlib.reload(sys.modules[_mod])
-    except Exception:
-        # First load or dependency not ready — safe to skip
-        pass
+        except Exception:
+            # Remove corrupted module so fresh import works
+            sys.modules.pop(_mod, None)
 
 # Import functions from other modules
 try:
@@ -533,7 +452,7 @@ try:
     from run_auto_apply import run_auto_apply_pipeline
     from cover_letter_generator import generate_cover_letter
     from location_utils import get_all_regions, get_region_display_name
-except ImportError as e:
+except (ImportError, KeyError) as e:
     st.error(f"Missing required module: {e}. Please ensure all files are in the same directory.")
     st.stop()
 
@@ -734,15 +653,21 @@ with col2:
                         f.write(uploaded_resume.getbuffer())
                     
                     # Parse resume
-                    # Preserve country from existing profile
+                    # Preserve user settings from existing profile
                     existing = load_json(PROFILE_FILE)
-                    existing_country = existing.get("country", "India") if existing else "India"
                     
                     profile = build_profile(resume_path, PROFILE_FILE)
                     
-                    # Re-add country to the saved profile
-                    if "country" not in profile:
-                        profile["country"] = existing_country
+                    # Re-add user-set fields that the parser doesn't know about
+                    if existing:
+                        for field in ["country", "state", "experience", "job_preference"]:
+                            if field not in profile and field in existing:
+                                profile[field] = existing[field]
+                        # Set defaults if first time
+                        profile.setdefault("country", "India")
+                        profile.setdefault("state", "Any")
+                        profile.setdefault("experience", "3–6 years")
+                        profile.setdefault("job_preference", "🔀 Both (local + remote)")
                         save_json(PROFILE_FILE, profile)
                     
                     st.success("✅ Resume parsed successfully!")
@@ -845,18 +770,50 @@ with st.expander("✏️ Edit Profile Manually" if profile else "✏️ Create P
             index=state_list.index(current_state) if current_state in state_list else 0,
             help="Refines search queries for more local results"
         )
+
+    # Experience and job preference
+    exp_col1, exp_col2 = st.columns(2)
+    with exp_col1:
+        EXP_OPTIONS = ["0–1 years", "1–3 years", "3–6 years", "6–10 years", "10+ years"]
+        current_exp = profile.get("experience", "3–6 years") if profile else "3–6 years"
+        if current_exp not in EXP_OPTIONS:
+            current_exp = "3–6 years"
+        exp_input = st.selectbox(
+            "📅 Years of Experience",
+            options=EXP_OPTIONS,
+            index=EXP_OPTIONS.index(current_exp),
+            help="Used to filter out jobs too senior or too junior for you"
+        )
+    with exp_col2:
+        PREF_OPTIONS = ["🏙️ Local jobs in my city", "🌐 Remote jobs", "🔀 Both (local + remote)"]
+        current_pref = profile.get("job_preference", "🔀 Both (local + remote)") if profile else "🔀 Both (local + remote)"
+        if current_pref not in PREF_OPTIONS:
+            current_pref = "🔀 Both (local + remote)"
+        pref_input = st.selectbox(
+            "🎯 Job Preference",
+            options=PREF_OPTIONS,
+            index=PREF_OPTIONS.index(current_pref),
+            help="Focus search on local city jobs, remote-only, or both"
+        )
     
     if st.button("💾 Save Profile", use_container_width=True):
         skills_list = [s.strip() for s in skills_input.split("\n") if s.strip()]
         if not skills_list and not name_input:
             st.error("⚠️ Please enter at least a name or some skills")
         else:
+            # Preserve fields from LLM parsing that user doesn't edit
+            existing = load_json(PROFILE_FILE) or {}
             updated_profile = {
                 "name": name_input or "Candidate",
                 "headline": headline_input,
                 "skills": skills_list,
                 "country": country_input,
                 "state": state_input,
+                "experience": exp_input,
+                "job_preference": pref_input,
+                # Preserve LLM-extracted fields
+                "industry": existing.get("industry", ""),
+                "search_terms": existing.get("search_terms", []),
             }
             save_json(PROFILE_FILE, updated_profile)
             st.success("✅ Profile saved!")
@@ -922,16 +879,38 @@ else:
     # Run matching
     if st.session_state.get("_matching_done"):
         st.success("✅ Matching complete! Scroll down to see your matches.")
-        if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
-            # Clear all matching data
-            st.session_state.pop("_matching_done", None)
-            for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
-                if os.path.exists(fp):
-                    os.remove(fp)
-            if os.path.exists(LETTERS_DIR):
-                for lf in os.listdir(LETTERS_DIR):
-                    os.remove(os.path.join(LETTERS_DIR, lf))
-            st.rerun()
+        
+        # Check if results are thin and user has a city — offer to expand
+        matches_data_check = load_json(MATCHES_FILE)
+        match_count = len(matches_data_check) if isinstance(matches_data_check, list) else 0
+        user_state = profile.get("state", "Any") if profile else "Any"
+        user_country = profile.get("country", "") if profile else ""
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Re-run Matching (Fresh Jobs)", use_container_width=True):
+                st.session_state.pop("_matching_done", None)
+                for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                    if os.path.exists(fp):
+                        os.remove(fp)
+                if os.path.exists(LETTERS_DIR):
+                    for lf in os.listdir(LETTERS_DIR):
+                        os.remove(os.path.join(LETTERS_DIR, lf))
+                st.rerun()
+        
+        with col2:
+            if match_count < 5 and user_state != "Any" and user_country:
+                if st.button(f"🌍 Expand to all of {user_country}", type="primary", use_container_width=True):
+                    # Widen search: set state to "Any" and re-run
+                    profile_data = load_json(PROFILE_FILE)
+                    if profile_data:
+                        profile_data["state"] = "Any"
+                        save_json(PROFILE_FILE, profile_data)
+                    st.session_state.pop("_matching_done", None)
+                    for fp in [JOBS_FILE, MATCHES_FILE, CACHE_FILE]:
+                        if os.path.exists(fp):
+                            os.remove(fp)
+                    st.rerun()
     
     elif st.session_state.get("_matching_running"):
         st.warning("⏳ Matching in progress... This may take 30-60 seconds.")
@@ -957,30 +936,42 @@ else:
 
             # Progress stages for the bar
             stage_pct = {
+                "🚀 Starting HYBRID": 0,
                 "Starting pipeline": 0,
-                "Profile loaded": 5,
-                "📡 Fetching": 10,
-                "Running": 15,
-                "WeWorkRemotely": 20,
-                "RemoteOK": 25,
-                "Remotive": 30,
-                "Lever": 35,
+                "👤 Profile loaded": 5,
+                "Fetching jobs": 8,
+                "📡 Loading jobs": 10,
+                "WeWorkRemotely": 12,
+                "RemoteOK": 15,
+                "Remotive": 20,
+                "Lever": 30,
                 "Google Jobs": 40,
-                "SerpAPI": 42,
-                "complete": 45,
-                "📊 Loaded": 50,
-                "🌍 Location": 52,
+                "SerpAPI": 40,
+                "📊 Loaded": 45,
+                "Loaded": 45,
+                "🌍 Applying location": 48,
+                "🌍 Location filter": 50,
+                "Location filter": 50,
+                "🎯 Building keyword": 52,
                 "🎯 Phase 1": 55,
-                "Analyzing job": 60,
+                "Phase 1": 55,
+                "⚡ Analyzing job": 60,
                 "✅ Phase 1 complete": 65,
-                "broadening": 67,
-                "🤖 Phase 2": 70,
-                "🧠 AI Batch 1": 72,
-                "🧠 AI Batch 2": 78,
-                "🧠 AI Batch 3": 84,
-                "🧠 AI Batch 4": 90,
-                "🎯 Phase 3": 93,
-                "✓ Found": 95,
+                "🤖 Phase 2": 68,
+                "🧠 AI Batch 1": 70,
+                "Batch 1": 70,
+                "✓ Batch 1": 73,
+                "🧠 AI Batch 2": 76,
+                "Batch 2": 76,
+                "✓ Batch 2": 79,
+                "🧠 AI Batch 3": 82,
+                "Batch 3": 82,
+                "✓ Batch 3": 86,
+                "🧠 AI Batch 4": 89,
+                "Batch 4": 89,
+                "✓ Batch 4": 92,
+                "🎯 Phase 3": 94,
+                "Threshold": 96,
                 "✅ Complete": 98,
                 "Done": 100,
             }
@@ -1128,6 +1119,29 @@ if isinstance(matches_data, list) and matches_data:
             with col1:
                 st.markdown(f"**{title}**")
                 st.markdown(f"🏢 **{company}** · <span class='source-badge'>{source}</span>", unsafe_allow_html=True)
+                
+                # Job location and experience info
+                job_location = job.get("location", "")
+                if not job_location:
+                    # Try to extract from summary or other fields
+                    for tag in job.get("location_tags", []):
+                        if tag:
+                            job_location = tag
+                            break
+                
+                info_parts = []
+                if job_location:
+                    info_parts.append(f"📍 {job_location}")
+                # Try to extract experience from summary
+                import re as _re
+                exp_match = _re.search(r'(\d+)\+?\s*(?:to\s*\d+\s*)?(?:years?|yrs?)\s*(?:of\s*)?(?:experience|exp)?', 
+                                       job.get("summary", "").lower())
+                if exp_match:
+                    info_parts.append(f"📅 {exp_match.group(0).strip()}")
+                
+                if info_parts:
+                    st.caption(" · ".join(info_parts))
+                
                 if summary:
                     st.write(summary)
             
