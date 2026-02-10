@@ -59,7 +59,7 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # Falls back to mistral if gemini fails
 MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))  # v2 default: return top 20-25 matches
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
 MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
@@ -755,8 +755,8 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     all_results.extend(scored_results)
 
     # ---- Phase 3: Filter, diversify, sort ----
-    # Adaptive threshold: try 55, then 50, then 45 to ensure we always return something
-    for threshold in [55, 50, 45]:
+    # Adaptive threshold: try 45, then 40, then 35 to ensure we always return something (v2-compatible)
+    for threshold in [45, 40, 35]:
         matches = []
         for job, score in all_results:
             if score >= threshold:
