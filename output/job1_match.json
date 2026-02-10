@@ -1,0 +1,17 @@
+{
+  "match_score": 75,
+  "fit_summary": "Candidate has relevant experience and skills but lacks specific knowledge of AI-enabled products.",
+  "strengths": [
+    "1-3 years experience in Product Operations, Customer Experience, or Technical Support",
+    "Experience working with ticketing platforms",
+    "Strong communication and cross-functional collaboration skills",
+    "Experience with SaaS tools and cloud platforms",
+    "Ability to conduct root cause analysis and produce post-incident reports",
+    "Familiarity with workflow automation tools"
+  ],
+  "gaps": [
+    "Lack of experience with AI-enabled products",
+    "No explicit mention of familiarity with SQL or analytics dashboards"
+  ],
+  "apply_recommendation": "yes"
+}

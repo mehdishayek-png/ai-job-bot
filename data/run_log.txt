@@ -1,0 +1,154 @@
+
+=== PROFILE DRIVEN AUTO APPLY ===
+
+Shortlisted jobs: 60
+
+Scoring jobs semantically...
+
+[1/60] Outsourced Pro Global: Sales Systems & CRM Support Associate
+⚡ Cached score: 0
+[2/60] Hightouch: Founding Technical ISV Alliance Lead
+⚡ Cached score: 0
+[3/60] HubSpot: Senior Director, Talent Acquisition Operations & Programs
+⚡ Cached score: 85
+[4/60] Simplero: Simplero Support Specialist (Full-Time, Remote)
+⚡ Cached score: 85
+[5/60] IFTTT: Community & Support Specialist - EST Time Zone (Remote Consultant)
+⚡ Cached score: 0
+[6/60] Abnormal: Senior Customer Success Manager, TOLA (Spanish speaking)
+⚡ Cached score: 75
+[7/60] Genesys: Product Management Director, CRM & Strategic Platform Integrations
+⚡ Cached score: 75
+[8/60] Medier: CRM Localization Specialist (German language)
+⚡ Cached score: 0
+[9/60] Bask Health: Customer Success Account Manager
+⚡ Cached score: 0
+[10/60] HubSpot: Manager, Solutions Engineering
+⚡ Cached score: 85
+[11/60] Aristocrat Technologies: CRM & Loyalty Manager
+⚡ Cached score: 95
+[12/60] Roofr: Senior Frontend Engineer - Contract
+⚡ Cached score: 0
+[13/60] Weir: Global CRM Lead
+⚡ Cached score: 85
+[14/60] Practicum bootcamp: Email Marketing & CRM Specialist
+⚡ Cached score: 75
+[15/60] RN Pad: Customer Onboarding/Success
+⚡ Cached score: 0
+[16/60] Order Desk: Technical Support Specialist
+⚡ Cached score: 0
+[17/60] Systems Engineer Enterprise Middleware
+⚡ Cached score: 0
+[18/60] Software Development Engineer Test Brazil
+⚡ Cached score: 0
+[19/60] Senior Enterprise Middleware Engineer
+⚡ Cached score: 75
+[20/60] Technical Account Manager
+⚡ Cached score: 85
+[21/60] Senior Angular Software Engineer
+⚡ Cached score: 0
+[22/60] Licensed Customer Success Representative
+⚡ Cached score: 0
+[23/60] Director of Tax Operations
+⚡ Cached score: 0
+[24/60] NFL Data Scientist
+⚡ Cached score: 75
+[25/60] AI Automation Engineer Tech Lead
+⚡ Cached score: 95
+[26/60] Product Data Analyst
+⚡ Cached score: 95
+[27/60] Bilingual Care Coordinator
+⚡ Cached score: 0
+[28/60] Sales Solution Engineer
+⚡ Cached score: 75
+[29/60] Senior Python Software Engineer
+⚡ Cached score: 0
+[30/60] Software Engineer
+⚡ Cached score: 70
+[31/60] Social Media Manager Platform
+⚡ Cached score: 75
+[32/60] Social Media Manager Temporary
+⚡ Cached score: 0
+[33/60] Pre Sales Engineer
+⚡ Cached score: 0
+[34/60] Social Media Analyst Platform
+⚡ Cached score: 75
+[35/60] B2B Marketing Manager
+⚡ Cached score: 0
+[36/60] Senior Data Engineer
+⚡ Cached score: 0
+[37/60] Sales Operations Analyst
+⚡ Cached score: 75
+[38/60] Revenue Operations Analyst
+⚡ Cached score: 95
+[39/60] AI Automation Engineer
+⚡ Cached score: 85
+[40/60] Google Cloud Platform Engineer
+⚡ Cached score: 85
+[41/60] Business Development Representative
+⚡ Cached score: 0
+[42/60] Junior Crypto Analyst & Trader
+⚡ Cached score: 0
+[43/60] Data & Technology Program Manager
+⚡ Cached score: 85
+[44/60] Product Marketing Manager
+⚡ Cached score: 0
+[45/60] Senior Full Stack Software Engineer ClickPipes Platform
+⚡ Cached score: 0
+[46/60] Senior Machine Learning Engineer AI Foundry
+⚡ Cached score: 0
+[47/60] Senior Technical Writer
+⚡ Cached score: 0
+[48/60] QA Engineer
+⚡ Cached score: 0
+[49/60] Hardware Infrastructure Site Reliability Engineer
+⚡ Cached score: 0
+[50/60] SDET Intern
+⚡ Cached score: 75
+[51/60] Senior Amazon Brand Manager
+⚡ Cached score: 0
+[52/60] Product, Platform & Enterprise Full Stack Sr/Staff Software Engineer
+⚡ Cached score: 0
+[53/60] Product, Platform & Enterprise Front End Sr/Staff Software Engineer
+⚡ Cached score: 75
+[54/60] Sr/Staff AI Engineer
+⚡ Cached score: 0
+[55/60] Product Developer / Engineer @ Fun Ecom Co | Great People & Flexible Hours
+⚡ Cached score: 0
+[56/60] Client Support Specialist
+⚡ Cached score: 0
+[57/60] Tech Lead Databricks Data Engineer
+⚡ Cached score: 0
+[58/60] Senior Front-End Developer- Analytics & UX Focused (Remote)
+⚡ Cached score: 0
+[59/60] AI Trainer
+⚡ Cached score: 0
+[60/60] Inside Sales Contractor
+⚡ Cached score: 0
+
+Semantic cache updated.
+
+=== BEST MATCHES ===
+
+Unknown: Aristocrat Technologies: CRM & Loyalty Manager
+Match score: 95%
+Apply → https://weworkremotely.com/remote-jobs/aristocrat-technologies-crm-loyalty-manager
+
+RemoteOK: AI Automation Engineer Tech Lead
+Match score: 95%
+Apply → https://remoteOK.com/remote-jobs/remote-ai-automation-engineer-tech-lead-myriad360-1130056
+
+RemoteOK: Product Data Analyst
+Match score: 95%
+Apply → https://remoteOK.com/remote-jobs/remote-product-data-analyst-big-health-1130055
+
+RemoteOK: Revenue Operations Analyst
+Match score: 95%
+Apply → https://remoteOK.com/remote-jobs/remote-revenue-operations-analyst-steer-1130022
+
+Unknown: HubSpot: Senior Director, Talent Acquisition Operations & Programs
+Match score: 85%
+Apply → https://weworkremotely.com/remote-jobs/hubspot-senior-director-talent-acquisition-operations-programs
+
+
+Best matches processed: 5

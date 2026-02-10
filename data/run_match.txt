@@ -1,0 +1,121 @@
+SYSTEM:
+You are an automated resume-job matching engine.
+
+STRICT RULES:
+- Output ONLY valid JSON
+- Do NOT ask questions
+- Do NOT explain
+- Do NOT include commentary
+- Do NOT include markdown
+
+TASK:
+Compare the candidate profile against the job description and evaluate fit.
+
+RULES:
+- match_score must be a NUMBER from 0 to 100
+- apply_recommendation must be exactly "yes" or "no"
+- strengths and gaps must be arrays of strings
+- fit_summary must be one concise sentence
+
+OUTPUT FORMAT:
+{
+  "match_score": number,
+  "fit_summary": string,
+  "strengths": [],
+  "gaps": [],
+  "apply_recommendation": "yes" | "no"
+}
+
+CANDIDATE PROFILE:
+{
+  "name": "MEHDI SHAYEK",
+  "headline": "Product Operations & Customer Experience Specialist",
+  "skills": [
+    "Product & Operations",
+    "Incident triage and management (P0/P1)",
+    "SLA and TAT management",
+    "root cause analysis (RCA) and post-mortems",
+    "cross-functional stakeholder coordination",
+    "SOP and work ow design",
+    "process optimization",
+    "predictive analytics",
+    "beta testing and product feedback"
+  ],
+  "experience_years": 2,
+  "roles": [
+    "Customer Experience & Operations Specialist @ Klarity.ai (2024-Present)",
+    "Quality Control Specialist @ Deluxe Media Entertainment (2021-2023)",
+    "Content Strategist @ Earthly Farms Ltd (2021-2022)"
+  ],
+  "education": [
+    "Diploma in Graphic Design @ AIDA School of Design (2022-2023)",
+    "Diploma in Visual Communication @ New Horizon PU College (2020-2022)",
+    "Pre-University Commerce (Marketing) @ New Horizon PU College (2016-2018)"
+  ],
+  "tools": [
+    "Zendesk",
+    "Workato",
+    "Amazon S3",
+    "Okta (SSO/IAM administration)",
+    "Slack",
+    "Email/Slack Connect",
+    "Linear",
+    "QC and video production software"
+  ],
+  "industries": [
+    "SaaS customer operations",
+    "enterprise incident response",
+    "SSO and authentication troubleshooting",
+    "document automation and AI workflows",
+    "streaming media quality assurance",
+    "identity and access management"
+  ],
+  "preferred_roles": [
+    "remote international product ops or CX operations role"
+  ],
+  "locations": [
+    "Bengaluru / Remote",
+    "Bangalore",
+    "Bengaluru, India"
+  ],
+  "remote": true
+}
+
+JOB DESCRIPTION:
+Job Title: Product Operations Specialist (Remote)
+
+Company Overview:
+We are a fast-growing SaaS company building workflow automation tools for enterprise customers. Our mission is to improve operational efficiency through intelligent product design and customer-centric processes.
+
+Role Overview:
+We are looking for a Product Operations Specialist to bridge the gap between Product, Engineering, and Customer Experience teams. This role will focus on incident management, product feedback loops, internal tooling optimization, and operational scalability.
+
+Responsibilities:
+- Manage and triage high-priority customer incidents (P0/P1) and ensure SLA adherence
+- Act as the operational liaison between support, product, and engineering teams
+- Analyze customer feedback and product usage data to identify improvement opportunities
+- Design and maintain SOPs and internal workflows
+- Coordinate beta testing programs and collect structured feedback
+- Monitor performance metrics including TAT, CSAT, and resolution times
+- Support rollout of new product features through internal enablement documentation
+
+Requirements:
+- 1–3 years experience in Product Operations, Customer Experience, or Technical Support
+- Experience working with ticketing platforms such as Zendesk or Freshdesk
+- Strong communication and cross-functional collaboration skills
+- Experience with SaaS tools and cloud platforms preferred
+- Ability to conduct root cause analysis and produce post-incident reports
+- Familiarity with workflow automation tools (Zapier, Workato, or similar) is a plus
+
+Nice to Have:
+- Experience working with AI-enabled products
+- Knowledge of SQL or analytics dashboards
+- Prior experience in remote-first teams
+
+Location:
+Remote (India preferred)
+
+Employment Type:
+Full-time
+
+

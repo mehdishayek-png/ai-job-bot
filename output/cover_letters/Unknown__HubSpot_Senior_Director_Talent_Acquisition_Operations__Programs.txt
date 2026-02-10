@@ -1,0 +1,5 @@
+**Dear HubSpot Team,**
+
+HubSpot’s vision to blend human judgment with AI-driven automation—to transform TA into a *human-led, AI-accelerated* force—aligns perfectly with my experience optimizing high-complexity SaaS hiring workflows. In my current role, I’ve embedded automation into onboarding (e.g., Slack integrations for new hire setup) and incident triage, reducing manual work while improving recruiter productivity and data quality. My background in Product Ops means I’ve not just managed tools but *designed scalable systems* that balance speed, compliance, and impact—like shifting Zendesk triage from reactive to predictive with Workato.
+
+What excites me most about this opportunity is leading a cross-functional team to architect TA operations as a product-driven platform. I’d bring hands-on expertise in governance, end-to-end workflows, and partnering with Analytics to drive strategy—while ensuring structures outlast individual leadership. Let’s discuss how I

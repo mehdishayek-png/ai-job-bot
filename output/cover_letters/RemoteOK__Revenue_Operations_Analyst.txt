@@ -1,0 +1,7 @@
+**Revenue Operations Analyst Cover Letter**
+
+Hi [Hiring Manager's Name],
+
+I thrive at the intersection of SaaS sales, onboarding, and operations—especially when it comes to building smooth, scalable workflows. My experience in incident triage and product operations has sharpened my ability to spot gaps in processes and automate solutions (like Okta integrations and Slack alerts) to keep teams aligned. At RemoteOK, I’d leverage that mindset to own deal flow at Steer, ensuring seamless handoffs between Sales, CS, and Onboarding with clean data and precise automation.
+
+I’m drawn to Steer’s mission of removing friction for repair shop owners. Having worked with Zendesk, Workato, and predictive analytics tools, I know how to blend technical rigor with customer-centric intuition. Whether auditing "Closed Won" deals or optimizing HubSpot workflows, I’d tackle Steer’s revenue lifecycle with a focus on detail, speed, and cross-team collaboration

@@ -1,0 +1,14 @@
+Dear Hiring Manager,
+
+I am excited to apply for the Product Operations Specialist role at your fast-growing SaaS company. With two years of experience in bridging the gap between Product, Engineering, and Customer Experience teams, I am confident in my ability to contribute effectively to your mission of improving operational efficiency through intelligent product design and customer-centric processes.
+
+In my current position as a Customer Experience & Operations Specialist at Klarity.ai, I have honed my skills in managing and triaging high-priority customer incidents (P0/P1), ensuring strict SLA adherence, and conducting root cause analyses to produce comprehensive post-incident reports. My experience with Zendesk and other ticketing platforms has been instrumental in streamlining our incident management process and enhancing customer satisfaction. Additionally, I have designed and maintained standard operating procedures (SOPs) and internal workflows, which have significantly improved our operational scalability.
+
+My background also includes roles as a Quality Control Specialist at Deluxe Media Entertainment and a Content Strategist at Earthly Farms Ltd., where I developed strong cross-functional collaboration skills and supported the rollout of new product features through detailed enablement documentation. I am proficient in using various SaaS tools and cloud platforms, including Workato and Amazon S3, and I am familiar with Zapier for workflow automation. These experiences have equipped me with the necessary skills to excel in this role.
+
+I am particularly drawn to this opportunity because of its alignment with my interests in SaaS customer operations, enterprise incident response, and identity and access management. My remote work experience and proficiency in using Slack and Linear make me well-suited for a remote-first environment, and I am eager to bring my expertise to your team.
+
+Thank you for considering my application. I look forward to the possibility of contributing to your company's success and am prepared to discuss how my skills and experiences can benefit your organization further.
+
+Sincerely,
+Mehdi Shayek

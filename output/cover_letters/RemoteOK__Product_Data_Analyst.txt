@@ -1,0 +1,5 @@
+**Dear Hiring Team,**
+
+I’m eager to bring my experience in product analytics to Big Health, where I can help drive evidence-based decisions for your digital therapeutics. With a background in SaaS support, onboarding, and incident triage, I’ve honed my ability to analyze user behavior and identify product friction—skills that align well with measuring engagement and clinical outcomes in tools like Looker, Snowflake, and dbt. My work in process optimization and tools (Workato, Zendesk) has sharpened my ability to translate data into actionable insights for cross-functional teams, so I’d welcome the chance to contribute your mission of scaling accessible, equitable mental health care.
+
+Your focus on at-scale product innovation—especially in partnerships with major systems like Scotland’s NHS—excites me. I thrive in collaborative environments and love uncovering patterns that inform better designs. Let me know if you’d like to discuss how my skills in predictive analytics, A/B testing, and

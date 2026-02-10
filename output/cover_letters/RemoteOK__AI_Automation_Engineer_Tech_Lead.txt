@@ -1,0 +1,5 @@
+**AI Automation Engineer Tech Lead Application**
+
+I thrive at the intersection of business needs and technical execution—whether troubleshooting complex workflows or optimizing processes using tools like Workato and Okta to reduce friction. My background in SaaS support and product operations has honed my ability to translate operational pain points into actionable AI/automation solutions. At RemoteOK, I’d leverage my hands-on experience with LLMs, RAG pipelines, and integrations to build scalable Microsoft 365–centric systems (Power Platform, ChatGPT, etc.) that improve efficiency and quality across teams.
+
+I’m particularly drawn to this role because of your focus on *agentic workflows* and *RAG*, blending predictive analytics with automation to solve real problems. I’ve designed Slack and Zendesk integrations that streamline incident response and onboarding, and I’d love to apply that same rigor to your shared backlog—delivering clear, collaborative, and production-ready automation
