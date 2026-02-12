@@ -59,11 +59,11 @@ client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 # Falls back to mistral if gemini fails
 MODEL = os.getenv("SCORING_MODEL", "google/gemini-2.5-flash")
 FALLBACK_MODEL = "mistralai/mistral-7b-instruct"
-MAX_MATCHES = int(os.getenv("MAX_MATCHES", "25"))  # v2 default: return top 20-25 matches
+MAX_MATCHES = int(os.getenv("MAX_MATCHES", "30"))  # Increased to 30 as requested
 API_RATE_LIMIT = float(os.getenv("API_RATE_LIMIT", "0.5"))
-MAX_LLM_CANDIDATES = 50  # Send more to LLM — Gemini is cheap and fast
+MAX_LLM_CANDIDATES = 60  # Increased to 60 to support more matches
 LLM_BATCH_SIZE = 15      # Gemini Flash handles 15 jobs per call easily
-MATCH_THRESHOLD = 35      # Local score threshold — be generous, let LLM decide
+MATCH_THRESHOLD = 25      # Lower threshold - was too aggressive at 35
 MAX_PER_COMPANY = 3       # Company diversity cap
 
 
@@ -498,11 +498,11 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     if not os.path.exists(jobs_file):
         if progress_callback:
             progress_callback("Fetching jobs from all sources (including Google Jobs, Lever)...")
-        from job_fetcher import fetch_all, build_serpapi_queries
+        from job_fetcher import fetch_all, build_queries_from_profile
 
-        # Generate profile-based SerpAPI queries for India-focused search
-        serpapi_queries = build_serpapi_queries(profile)
-        logger.info(f"SerpAPI queries: {[q['q'] for q in serpapi_queries]}")
+        # Generate profile-based queries for job search
+        queries, location = build_queries_from_profile(profile)
+        logger.info(f"Search queries: {queries}, location: {location}")
 
         # Determine whether to prioritize local sources based on profile location preferences
         location_prefs = profile.get("location_preferences", ["global"])
@@ -513,7 +513,7 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
         if prioritize_local:
             logger.info("Profile requests local prioritization — prioritizing SerpAPI/Lever over large remote boards")
 
-        fetch_all(output_path=jobs_file, serpapi_queries=serpapi_queries, prioritize_local=prioritize_local)
+        fetch_all(output_path=jobs_file, profile=profile, prioritize_local=prioritize_local)
 
     with open(jobs_file, "r", encoding="utf-8") as f:
         jobs = json.load(f)
@@ -604,6 +604,20 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     scored_jobs = []
     filtered_stats = {"non_english": 0, "too_senior": 0, "low_score": 0, "passed": 0}
 
+    # Helper to check if job is local/regional
+    def is_local_job(job):
+        jt = f"{job.get('title','')} {job.get('summary','')} {job.get('company','')} {job.get('source','')}".lower()
+        if any(alias in jt for alias in country_aliases):
+            return True
+        tags = job.get('location_tags', [])
+        if isinstance(tags, (list, tuple)) and any(t in ('asia', user_country_lc) for t in tags):
+            return True
+        # Also check if source is local-focused (Google Jobs, LinkedIn, Naukri are more local)
+        source = job.get('source', '').lower()
+        if any(s in source for s in ['google jobs', 'linkedin', 'naukri', 'lever']):
+            return True
+        return False
+
     for job in jobs:
         title = job.get("title", "")
         summary = job.get("summary", "")
@@ -623,12 +637,20 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
             filtered_stats["low_score"] += 1
             continue
 
-        job["_local_score"] = local["score"]
+        # BOOST LOCAL JOBS: Add 20-point bonus to local/regional jobs
+        is_local = is_local_job(job)
+        boosted_score = local["score"]
+        if is_local:
+            boosted_score = min(100, local["score"] + 20)
+        
+        job["_local_score"] = boosted_score
+        job["_original_score"] = local["score"]
+        job["_is_local"] = is_local
         job["_local_detail"] = local
         scored_jobs.append(job)
         filtered_stats["passed"] += 1
 
-    # Sort by local score
+    # Sort by boosted local score (local jobs will rank higher)
     scored_jobs.sort(key=lambda j: j.get("_local_score", 0), reverse=True)
 
     logger.info(f"Phase 1 (local): {total_unique} → {filtered_stats['passed']} passed "
@@ -755,16 +777,20 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
     all_results.extend(scored_results)
 
     # ---- Phase 3: Filter, diversify, sort ----
-    # Adaptive threshold: try 45, then 40, then 35 to ensure we always return something (v2-compatible)
-    for threshold in [45, 40, 35]:
+    # Adaptive threshold: try 50, then 45, then 40 to ensure we always return something
+    for threshold in [50, 45, 40]:
         matches = []
         for job, score in all_results:
             if score >= threshold:
                 m = job.copy()
+                # Preserve local flag for remote job filtering
+                is_local_flag = m.get("_is_local", False)
                 m.pop("_local_score", None)
+                m.pop("_original_score", None)
                 m.pop("_local_detail", None)
                 m.pop("_cache_key", None)
                 m["match_score"] = score
+                m["_is_local"] = is_local_flag  # Keep this for final filtering
                 matches.append(m)
 
         if matches:
@@ -775,6 +801,42 @@ def run_pipeline(profile_file, jobs_file, session_dir, letters_dir=None, progres
 
     matches.sort(key=lambda x: x["match_score"], reverse=True)
     matches = enforce_company_diversity(matches)
+    
+    # ---- ENFORCE 10% REMOTE JOB CAP ----
+    # If user has local preferences, limit remote jobs to 10% of final results
+    if prioritize_local_run and user_country_lc and user_country_lc != "remote only":
+        local_matches = []
+        remote_matches = []
+        
+        for m in matches:
+            # Check if job is local/regional
+            is_local = m.get("_is_local", False)
+            if not is_local:
+                # Double-check using source and content
+                source = m.get("source", "").lower()
+                job_text = f"{m.get('title','')} {m.get('summary','')} {m.get('location','')}".lower()
+                
+                # Remote job indicators
+                is_remote = any(keyword in source for keyword in ["remotework", "remoteok", "remote"]) or \
+                           ("remote" in job_text and not any(alias in job_text for alias in country_aliases))
+                
+                if is_remote:
+                    remote_matches.append(m)
+                else:
+                    local_matches.append(m)
+            else:
+                local_matches.append(m)
+        
+        # Calculate 10% cap on remote jobs
+        target_total = min(MAX_MATCHES, len(matches))
+        max_remote = max(3, int(target_total * 0.1))  # At least 3 remote jobs, max 10%
+        
+        # Rebalance: prioritize local jobs
+        rebalanced = local_matches[:target_total - max_remote] + remote_matches[:max_remote]
+        
+        logger.info(f"Remote job cap applied: {len(local_matches)} local + {len(remote_matches[:max_remote])} remote (was {len(remote_matches)} remote)")
+        matches = rebalanced
+    
     matches = matches[:MAX_MATCHES]
 
     logger.info(f"Final: {len(matches)} matches from {len(top_candidates)} candidates ({api_calls} API calls)")
